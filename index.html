@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#07152f">
+<title>Mahim UltraNet WiFi</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+ font-family:Arial,sans-serif;
+ background:#07152f;
+ color:#fff;
+ line-height:1.6;
+}
+header{
+ padding:20px;
+ text-align:center;
+ background:#0d2044;
+ border-bottom:1px solid #193a6b;
+}
+.logo{font-size:25px;font-weight:bold;color:#38d9ff}
+.logo span{color:#fff}
+header p{color:#a9c5e8;font-size:13px}
+.container{max-width:950px;margin:auto;padding:20px}
+.hero{
+ text-align:center;
+ padding:40px 15px;
+ background:linear-gradient(135deg,#102d60,#075b83);
+ border-radius:18px;
+ margin-bottom:25px;
+}
+.hero h1{font-size:29px;margin-bottom:10px}
+.hero p{color:#d4eaff}
+.btn{
+ display:inline-block;
+ padding:12px 22px;
+ border:0;
+ border-radius:9px;
+ background:#13c9ed;
+ color:#06172e;
+ font-weight:bold;
+ cursor:pointer;
+ margin-top:15px;
+}
+.section-title{
+ text-align:center;
+ margin:30px 0 18px;
+ font-size:23px;
+ color:#38d9ff;
+}
+.card{
+ background:#102344;
+ border:1px solid #24436e;
+ border-radius:14px;
+ padding:20px;
+ margin-bottom:18px;
+}
+.card h3{color:#38d9ff;margin-bottom:12px}
+input,select{
+ width:100%;
+ padding:13px;
+ margin:8px 0;
+ border-radius:8px;
+ border:1px solid #385477;
+ background:#07152f;
+ color:white;
+ font-size:15px;
+}
+.grid{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+ gap:14px;
+}
+.package{
+ background:#102344;
+ border:1px solid #24436e;
+ padding:18px;
+ border-radius:13px;
+ text-align:center;
+}
+.price{font-size:25px;color:#38d9ff;font-weight:bold}
+.package p{color:#b9cce5}
+footer{
+ text-align:center;
+ padding:25px;
+ color:#9db5d5;
+ font-size:13px;
+}
+.notice{
+ color:#b9cce5;
+ font-size:13px;
+ margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+ <div class="logo">MAHIM <span>UltraNet</span></div>
+ <p>Fast • Secure • Reliable WiFi</p>
+</header>
+
+<main class="container">
+
+ <section class="hero">
+  <h1>স্বাগতম Mahim UltraNet WiFi-তে</h1>
+  <p>দ্রুতগতির ইন্টারনেট, সহজ রিচার্জ এবং নির্ভরযোগ্য সেবা।</p>
+  <button class="btn" onclick="document.getElementById('login').scrollIntoView({behavior:'smooth'})">
+   Login করুন
+  </button>
+ </section>
+
+ <h2 class="section-title">👤 Customer Login</h2>
+
+ <section class="card" id="login">
+  <h3>আপনার অ্যাকাউন্টে প্রবেশ করুন</h3>
+  <form onsubmit="demo(event,'লগইন সেবা এখনো চালু হয়নি।')">
+   <input type="tel" placeholder="মোবাইল নম্বর" required>
+   <input type="password" placeholder="পাসওয়ার্ড" required>
+   <button class="btn" type="submit">Login</button>
+  </form>
+  <p class="notice">নতুন গ্রাহক? অ্যাকাউন্ট তৈরি করতে রেজিস্ট্রেশন অংশ দেখুন।</p>
+ </section>
+
+ <h2 class="section-title">📝 নতুন অ্যাকাউন্ট</h2>
+
+ <section class="card">
+  <h3>Customer Registration</h3>
+  <form onsubmit="demo(event,'রেজিস্ট্রেশন সেবা এখনো চালু হয়নি।')">
+   <input type="text" placeholder="আপনার নাম" required>
+   <input type="tel" placeholder="মোবাইল নম্বর" required>
+   <input type="password" placeholder="নতুন পাসওয়ার্ড" minlength="8" required>
+   <button class="btn" type="submit">অ্যাকাউন্ট তৈরি করুন</button>
+  </form>
+ </section>
+
+ <h2 class="section-title">📦 Internet Packages</h2>
+
+ <section class="grid">
+  <div class="package">
+   <h3>Hourly Pack</h3>
+   <div class="price">৳ 10</div>
+   <p>১ ঘণ্টা ইন্টারনেট</p>
+  </div>
+
+  <div class="package">
+   <h3>Daily Pack</h3>
+   <div class="price">৳ 20</div>
+   <p>২৪ ঘণ্টা ইন্টারনেট</p>
+  </div>
+
+  <div class="package">
+   <h3>Weekly Pack</h3>
+   <div class="price">৳ 100</div>
+   <p>৭ দিনের ইন্টারনেট</p>
+  </div>
+
+  <div class="package">
+   <h3>Monthly Pack</h3>
+   <div class="price">৳ 300</div>
+   <p>৩০ দিনের ইন্টারনেট</p>
+  </div>
+ </section>
+
+ <h2 class="section-title">💳 Recharge</h2>
+
+ <section class="card">
+  <h3>বিকাশ / নগদ রিচার্জ</h3>
+  <form onsubmit="demo(event,'রিচার্জ সেবা এখনো চালু হয়নি।')">
+   <select required>
+    <option value="">পেমেন্ট মাধ্যম নির্বাচন করুন</option>
+    <option>bKash</option>
+    <option>Nagad</option>
+   </select>
+   <input type="tel" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" required>
+   <input type="number" placeholder="টাকার পরিমাণ" min="1" required>
+   <input type="text" placeholder="Transaction ID" required>
+   <button class="btn" type="submit">রিচার্জ আবেদন করুন</button>
+  </form>
+ </section>
+
+ <h2 class="section-title">📞 Customer Support</h2>
+
+ <section class="card" style="text-align:center">
+  <h3>আমাদের সাথে যোগাযোগ করুন</h3>
+  <p>Mahim UltraNet WiFi Customer Care</p>
+  <p class="notice">যোগাযোগের নম্বর ও WhatsApp লিংক পরে যুক্ত করা হবে।</p>
+ </section>
+
+</main>
+
+<footer>
+ © 2026 Mahim UltraNet WiFi<br>
+ All Rights Reserved.
+</footer>
+
+<script>
+function demo(event,message){
+ event.preventDefault();
+ alert(message);
+}
+</script>
+
+</body>
+  </html>
+  
