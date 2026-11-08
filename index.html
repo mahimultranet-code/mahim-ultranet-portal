@@ -1,210 +1,114 @@
-
 <!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#07152f">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#071b35">
 <title>Mahim UltraNet WiFi</title>
-
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
- font-family:Arial,sans-serif;
- background:#07152f;
- color:#fff;
- line-height:1.6;
-}
-header{
- padding:20px;
- text-align:center;
- background:#0d2044;
- border-bottom:1px solid #193a6b;
-}
-.logo{font-size:25px;font-weight:bold;color:#38d9ff}
-.logo span{color:#fff}
-header p{color:#a9c5e8;font-size:13px}
-.container{max-width:950px;margin:auto;padding:20px}
-.hero{
- text-align:center;
- padding:40px 15px;
- background:linear-gradient(135deg,#102d60,#075b83);
- border-radius:18px;
- margin-bottom:25px;
-}
-.hero h1{font-size:29px;margin-bottom:10px}
-.hero p{color:#d4eaff}
-.btn{
- display:inline-block;
- padding:12px 22px;
- border:0;
- border-radius:9px;
- background:#13c9ed;
- color:#06172e;
- font-weight:bold;
- cursor:pointer;
- margin-top:15px;
-}
-.section-title{
- text-align:center;
- margin:30px 0 18px;
- font-size:23px;
- color:#38d9ff;
-}
-.card{
- background:#102344;
- border:1px solid #24436e;
- border-radius:14px;
- padding:20px;
- margin-bottom:18px;
-}
-.card h3{color:#38d9ff;margin-bottom:12px}
-input,select{
- width:100%;
- padding:13px;
- margin:8px 0;
- border-radius:8px;
- border:1px solid #385477;
- background:#07152f;
- color:white;
- font-size:15px;
-}
-.grid{
- display:grid;
- grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
- gap:14px;
-}
-.package{
- background:#102344;
- border:1px solid #24436e;
- padding:18px;
- border-radius:13px;
- text-align:center;
-}
-.price{font-size:25px;color:#38d9ff;font-weight:bold}
-.package p{color:#b9cce5}
-footer{
- text-align:center;
- padding:25px;
- color:#9db5d5;
- font-size:13px;
-}
-.notice{
- color:#b9cce5;
- font-size:13px;
- margin-top:10px;
-}
+:root{--bg:#071b35;--panel:#102b4d;--panel2:#15385f;--cyan:#36d8ed;--text:#f4f8ff;--muted:#b8c9dd;--line:#2b5278;--green:#21c58e}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;background:linear-gradient(160deg,#06152b,#0a2a4c 55%,#071b35);color:var(--text);line-height:1.55}
+.wrap{max-width:1050px;margin:auto;padding:18px}.hero{text-align:center;padding:30px 16px 24px}.logo{width:72px;height:72px;border-radius:22px;margin:auto auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,#22c9e7,#1768a8);font-size:30px;font-weight:900;color:#041a30;box-shadow:0 10px 35px #00c9e755}
+h1{font-size:clamp(25px,5vw,40px);margin:8px 0;color:white}.tag{color:var(--cyan);font-weight:700}.intro{color:var(--muted);margin:8px auto;max-width:650px}
+section,.panel{background:#0e2948eF;border:1px solid var(--line);border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 12px 30px #0002}
+h2{font-size:21px;margin:0 0 14px;color:var(--cyan)}h3{margin:0 0 8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px}
+.package{background:linear-gradient(145deg,#163b63,#102b4a);border:1px solid #2a5a83;border-radius:13px;padding:13px;text-align:center}
+.price{font-size:25px;font-weight:850;color:#65e7f4}.duration{color:#d7e5f4;font-size:14px}
+.note{color:var(--muted);font-size:14px}.emergency{border-color:#b87838;background:linear-gradient(130deg,#392b25,#17314c)}
+.emergency strong{color:#ffd18a}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+a.btn,button{display:inline-block;border:0;border-radius:11px;padding:11px 15px;background:var(--cyan);color:#052038;font-weight:800;text-decoration:none;cursor:pointer;font-size:15px}
+a.secondary{background:#214a70;color:white;border:1px solid #47749b}
+label{display:block;margin:10px 0 5px;color:#d9e8f7;font-size:14px}
+input,select,textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #42688b;background:#071d35;color:white;font:inherit}
+form{max-width:620px} .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+footer{text-align:center;color:var(--muted);padding:22px 10px;font-size:14px}
+a{color:#75e9f4}.contactline{margin:6px 0;overflow-wrap:anywhere}.warning{background:#3b2e1d;border:1px solid #8b6835;padding:12px;border-radius:12px;color:#ffe2ae;font-size:14px}
+@media(max-width:520px){.wrap{padding:12px}.hero{padding-top:22px}section{padding:15px}}
 </style>
 </head>
-
 <body>
-
-<header>
- <div class="logo">MAHIM <span>UltraNet</span></div>
- <p>Fast • Secure • Reliable WiFi</p>
+<div class="wrap">
+<header class="hero">
+ <div class="logo">MU</div>
+ <div class="tag">দ্রুত • নির্ভরযোগ্য • সাশ্রয়ী</div>
+ <h1>Mahim UltraNet WiFi</h1>
+ <p class="intro">আপনার ইন্টারনেট রিচার্জ ও প্যাকেজের তথ্য এক জায়গায়। পছন্দের প্যাকেজ দেখে পেমেন্টের নির্দেশনা অনুসরণ করুন।</p>
 </header>
 
-<main class="container">
+<section>
+<h2>📶 ইন্টারনেট প্যাকেজ</h2>
+<div class="grid" id="packages"></div>
+<p class="note">প্যাকেজের মেয়াদ ও মূল্য দেখে সঠিক প্যাকেজ নির্বাচন করুন।</p>
+</section>
 
- <section class="hero">
-  <h1>স্বাগতম Mahim UltraNet WiFi-তে</h1>
-  <p>দ্রুতগতির ইন্টারনেট, সহজ রিচার্জ এবং নির্ভরযোগ্য সেবা।</p>
-  <button class="btn" onclick="document.getElementById('login').scrollIntoView({behavior:'smooth'})">
-   Login করুন
-  </button>
- </section>
+<section class="emergency">
+<h2>🚨 জরুরি ইন্টারনেট</h2>
+<p><strong>৩০ মিনিট জরুরি ইন্টারনেট — ৳৬</strong></p>
+<p class="note">কমপক্ষে ৫ বার সফলভাবে রিচার্জ করেছেন এমন গ্রাহক এই সুবিধা নিতে পারবেন। জরুরি ব্যবহারের ৳৬ পরবর্তী রিচার্জের সঙ্গে পরিশোধ করতে হবে। আগের বকেয়া পরিশোধ না করা পর্যন্ত নতুন জরুরি সেশন নেওয়া যাবে না।</p>
+<div class="warning">এই শর্তগুলো বর্তমানে তথ্য হিসেবে দেখানো হচ্ছে। গ্রাহকের যোগ্যতা, বকেয়া আদায় ও ইন্টারনেট চালু করার স্বয়ংক্রিয় ব্যবস্থা নিরাপদ সার্ভার ও MikroTik সংযোগ তৈরি হলে কার্যকর হবে।</div>
+</section>
 
- <h2 class="section-title">👤 Customer Login</h2>
+<section>
+<h2>💳 রিচার্জ পেমেন্ট</h2>
+<p>নিচের নম্বরে <b>Personal Send Money</b> করুন। পেমেন্টের পর ট্রানজেকশন আইডি দিয়ে রিচার্জের আবেদন জমা দিন।</p>
+<div class="grid">
+ <div class="package"><h3>bKash</h3><div class="price" style="font-size:20px">01723054631</div><div class="duration">Personal Send Money</div></div>
+ <div class="package"><h3>Nagad</h3><div class="price" style="font-size:20px">01324078406</div><div class="duration">Personal Send Money</div></div>
+</div>
+<form id="rechargeForm">
+ <div class="formgrid">
+  <div><label for="customer">গ্রাহকের নাম</label><input id="customer" required placeholder="আপনার নাম"></div>
+  <div><label for="phone">মোবাইল নম্বর</label><input id="phone" required inputmode="tel" placeholder="01XXXXXXXXX"></div>
+  <div><label for="package">প্যাকেজ</label><select id="package" required><option value="">প্যাকেজ নির্বাচন করুন</option></select></div>
+  <div><label for="method">পেমেন্ট মাধ্যম</label><select id="method" required><option value="">নির্বাচন করুন</option><option>bKash</option><option>Nagad</option></select></div>
+  <div><label for="trx">Transaction ID</label><input id="trx" required placeholder="ট্রানজেকশন আইডি"></div>
+ </div>
+<button type="submit" style="margin-top:14px">রিচার্জ আবেদন প্রস্তুত করুন</button>
+<p class="note">এটি এখনো সার্ভারে আবেদন পাঠায় না; আপনার দেওয়া তথ্য কপি করে অ্যাডমিনকে পাঠানোর প্রস্তুতি দেখাবে।</p>
+</form>
+<div id="formStatus" class="note" aria-live="polite"></div>
+</section>
 
- <section class="card" id="login">
-  <h3>আপনার অ্যাকাউন্টে প্রবেশ করুন</h3>
-  <form onsubmit="demo(event,'লগইন সেবা এখনো চালু হয়নি।')">
-   <input type="tel" placeholder="মোবাইল নম্বর" required>
-   <input type="password" placeholder="পাসওয়ার্ড" required>
-   <button class="btn" type="submit">Login</button>
-  </form>
-  <p class="notice">নতুন গ্রাহক? অ্যাকাউন্ট তৈরি করতে রেজিস্ট্রেশন অংশ দেখুন।</p>
- </section>
+<section>
+<h2>👤 গ্রাহক লগইন / অ্যাকাউন্ট</h2>
+<p class="note">ফোন নম্বর ও পাসওয়ার্ড দিয়ে লগইন এবং নতুন অ্যাকাউন্ট তৈরির অংশ পরবর্তী নিরাপদ ব্যাকএন্ড সংযোগের জন্য রাখা হয়েছে।</p>
+<div class="formgrid">
+ <form id="loginForm"><h3>লগইন</h3><label>মোবাইল নম্বর</label><input type="tel" placeholder="01XXXXXXXXX" required><label>পাসওয়ার্ড</label><input type="password" placeholder="পাসওয়ার্ড" required><button type="submit" style="margin-top:12px">লগইন</button></form>
+ <form id="signupForm"><h3>নতুন অ্যাকাউন্ট</h3><label>নাম</label><input placeholder="আপনার নাম" required><label>মোবাইল নম্বর</label><input type="tel" placeholder="01XXXXXXXXX" required><label>পাসওয়ার্ড (কমপক্ষে ৮ অক্ষর)</label><input type="password" minlength="8" placeholder="পাসওয়ার্ড" required><button type="submit" style="margin-top:12px">অ্যাকাউন্ট তৈরি</button></form>
+</div>
+<p class="warning">সতর্কতা: লগইন/সাইনআপ এখনো সক্রিয় নয়। নিরাপদ Authentication ও সার্ভার ছাড়া পাসওয়ার্ড বা গ্রাহকের তথ্য সংরক্ষণ করা হবে না।</p>
+</section>
 
- <h2 class="section-title">📝 নতুন অ্যাকাউন্ট</h2>
-
- <section class="card">
-  <h3>Customer Registration</h3>
-  <form onsubmit="demo(event,'রেজিস্ট্রেশন সেবা এখনো চালু হয়নি।')">
-   <input type="text" placeholder="আপনার নাম" required>
-   <input type="tel" placeholder="মোবাইল নম্বর" required>
-   <input type="password" placeholder="নতুন পাসওয়ার্ড" minlength="8" required>
-   <button class="btn" type="submit">অ্যাকাউন্ট তৈরি করুন</button>
-  </form>
- </section>
-
- <h2 class="section-title">📦 Internet Packages</h2>
-
- <section class="grid">
-  <div class="package">
-   <h3>Hourly Pack</h3>
-   <div class="price">৳ 10</div>
-   <p>১ ঘণ্টা ইন্টারনেট</p>
-  </div>
-
-  <div class="package">
-   <h3>Daily Pack</h3>
-   <div class="price">৳ 20</div>
-   <p>২৪ ঘণ্টা ইন্টারনেট</p>
-  </div>
-
-  <div class="package">
-   <h3>Weekly Pack</h3>
-   <div class="price">৳ 100</div>
-   <p>৭ দিনের ইন্টারনেট</p>
-  </div>
-
-  <div class="package">
-   <h3>Monthly Pack</h3>
-   <div class="price">৳ 300</div>
-   <p>৩০ দিনের ইন্টারনেট</p>
-  </div>
- </section>
-
- <h2 class="section-title">💳 Recharge</h2>
-
- <section class="card">
-  <h3>বিকাশ / নগদ রিচার্জ</h3>
-  <form onsubmit="demo(event,'রিচার্জ সেবা এখনো চালু হয়নি।')">
-   <select required>
-    <option value="">পেমেন্ট মাধ্যম নির্বাচন করুন</option>
-    <option>bKash</option>
-    <option>Nagad</option>
-   </select>
-   <input type="tel" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" required>
-   <input type="number" placeholder="টাকার পরিমাণ" min="1" required>
-   <input type="text" placeholder="Transaction ID" required>
-   <button class="btn" type="submit">রিচার্জ আবেদন করুন</button>
-  </form>
- </section>
-
- <h2 class="section-title">📞 Customer Support</h2>
-
- <section class="card" style="text-align:center">
-  <h3>আমাদের সাথে যোগাযোগ করুন</h3>
-  <p>Mahim UltraNet WiFi Customer Care</p>
-  <p class="notice">যোগাযোগের নম্বর ও WhatsApp লিংক পরে যুক্ত করা হবে।</p>
- </section>
-
-</main>
-
-<footer>
- © 2026 Mahim UltraNet WiFi<br>
- All Rights Reserved.
-</footer>
-
+<section>
+<h2>☎️ যোগাযোগ ও অভিযোগ</h2>
+<p class="contactline"><b>অ্যাডমিন:</b> মোহাম্মদ আবদুল মালেক হোসেন</p>
+<p class="contactline"><b>ঠিকানা:</b> পূর্ব শিকারপুর, খামার পাড়া</p>
+<p class="contactline"><b>WhatsApp:</b> <a href="https://wa.me/8801723054631" target="_blank" rel="noopener">01723054631 — WhatsApp-এ যোগাযোগ</a></p>
+<p class="contactline"><b>Messenger:</b> <a href="https://m.me/Md.A.Malek.Hossain" target="_blank" rel="noopener">মেসেঞ্জারে বার্তা পাঠান</a></p>
+<p class="contactline"><b>বিকাশ:</b> 01723054631 (Personal Send Money)</p>
+<p class="contactline"><b>নগদ:</b> 01324078406 (Personal Send Money)</p>
+</section>
+<footer>© <span id="year"></span> Mahim UltraNet WiFi · All rights reserved</footer>
+</div>
 <script>
-function demo(event,message){
- event.preventDefault();
- alert(message);
-}
+const packages=[
+[2,"৩০ মিনিট"],[4,"২ ঘণ্টা"],[6,"৫ ঘণ্টা"],[8,"৯ ঘণ্টা"],[10,"১২ ঘণ্টা"],[12,"১৪ ঘণ্টা"],[14,"১৬ ঘণ্টা"],[16,"১ দিন"],[18,"২ দিন"],[26,"৩ দিন"],[34,"৪ দিন"],[44,"৫ দিন"],[52,"৬ দিন"],[60,"৭ দিন"],[70,"৮ দিন"],[78,"৯ দিন"],[86,"১০ দিন"],[96,"১১ দিন"],[114,"১২ দিন"],[116,"১৩ দিন"],[118,"১৪ দিন"],[120,"১৫ দিন"],[122,"১৬ দিন"],[124,"১৭ দিন"],[126,"১৮ দিন"],[128,"১৯ দিন"],[130,"২০ দিন"],[132,"২১ দিন"],[134,"২২ দিন"],[136,"২৩ দিন"],[138,"২৪ দিন"],[140,"২৫ দিন"],[142,"২৬ দিন"],[144,"২৭ দিন"],[146,"২৮ দিন"],[148,"২৯ দিন"],[150,"১ মাস"],[280,"২ মাস"],[360,"৩ মাস"],[400,"৪ মাস"]
+];
+const grid=document.getElementById('packages'), select=document.getElementById('package');
+packages.forEach(([price,duration])=>{
+ const card=document.createElement('div');card.className='package';
+ const p=document.createElement('div');p.className='price';p.textContent='৳'+price;
+ const d=document.createElement('div');d.className='duration';d.textContent=duration;
+ card.append(p,d);grid.append(card);
+ const opt=document.createElement('option');opt.value=price+' টাকা — '+duration;opt.textContent='৳'+price+' — '+duration;select.append(opt);
+});
+document.getElementById('year').textContent=new Date().getFullYear();
+document.getElementById('rechargeForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const data={name:document.getElementById('customer').value,phone:document.getElementById('phone').value,package:select.value,payment:document.getElementById('method').value,transaction:document.getElementById('trx').value};
+ const msg='Mahim UltraNet WiFi রিচার্জ আবেদন%0Aনাম: '+encodeURIComponent(data.name)+'%0Aমোবাইল: '+encodeURIComponent(data.phone)+'%0Aপ্যাকেজ: '+encodeURIComponent(data.package)+'%0Aপেমেন্ট: '+encodeURIComponent(data.payment)+'%0ATransaction ID: '+encodeURIComponent(data.transaction);
+ document.getElementById('formStatus').innerHTML='আবেদনের তথ্য প্রস্তুত। WhatsApp-এ অ্যাডমিনকে পাঠাতে নিচের লিংকে চাপ দিন: <a target="_blank" rel="noopener" href="https://wa.me/8801723054631?text='+msg+'">WhatsApp-এ আবেদন পাঠান</a>। অ্যাডমিন যাচাই না করা পর্যন্ত রিচার্জ সম্পন্ন হবে না।';
+});
+['loginForm','signupForm'].forEach(id=>document.getElementById(id).addEventListener('submit',e=>{e.preventDefault();alert('এই সুবিধাটি নিরাপদ সার্ভার সংযোগের পর চালু হবে। এখনো লগইন বা অ্যাকাউন্ট তৈরি হচ্ছে না।');}));
 </script>
-
-</body>
-  </html>
-  
+</body></html>
