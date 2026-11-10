@@ -1,0 +1,175 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#071426">
+<title>Mahim UltraNet | Premium WiFi Portal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+:root{--bg:#071426;--card:#10233b;--cyan:#16d9ef;--text:#f4f8ff;--muted:#9aabc0;--line:#203650}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Hind Siliguri',sans-serif;padding-bottom:90px}
+button,input{font:inherit}
+header{padding:22px 18px 18px;background:linear-gradient(135deg,#102d4d,#071426);border-bottom:1px solid var(--line)}
+.top{display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:21px;font-weight:700;color:white}
+.logo span{color:var(--cyan)}
+.small{font-size:12px;color:var(--muted)}
+.status{font-size:11px;color:#63e6b2;border:1px solid #286b58;padding:5px 10px;border-radius:30px}
+main{max-width:700px;margin:auto;padding:16px}
+.hero{padding:22px;border-radius:20px;background:linear-gradient(125deg,#075a79,#12365c 65%,#17264b);position:relative;overflow:hidden}
+.hero:after{content:'◉';position:absolute;right:12px;top:0;font-size:110px;color:#ffffff12}
+.hero h1{font-size:25px;margin:5px 0}
+.hero p{color:#d2e9f4;margin:4px 0}
+.demo{display:inline-block;margin-top:12px;background:#ffffff20;padding:5px 12px;border-radius:20px;font-size:11px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:16px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:16px}
+.card h3{font-size:14px;color:var(--muted);margin:0 0 7px}
+.big{font-size:25px;font-weight:700;color:var(--cyan)}
+.section-title{font-size:19px;margin:24px 0 12px}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.action{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 5px;text-align:center;font-size:13px}
+.action b{display:block;font-size:23px;margin-bottom:5px}
+.tabs{display:flex;gap:8px;margin:16px 0}
+.tab{flex:1;border:1px solid var(--line);background:var(--card);color:var(--muted);padding:10px 5px;border-radius:12px}
+.tab.active{background:#0a566b;border-color:var(--cyan);color:white}
+.package-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.pkg{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:13px}
+.pkg strong{font-size:21px;color:var(--cyan)}
+.pkg p{margin:3px 0;color:var(--muted);font-size:13px}
+.pkg button,.primary{width:100%;border:0;background:linear-gradient(90deg,#08b9d4,#167de0);color:white;padding:10px;border-radius:10px;margin-top:9px;font-weight:600}
+.panel{display:none}
+.panel.active{display:block}
+.info{background:#102d40;border:1px solid #1a5365;padding:13px;border-radius:13px;color:#bcecf5;font-size:13px;margin:14px 0}
+input{width:100%;padding:12px;background:#091a2d;border:1px solid var(--line);border-radius:10px;color:white;margin:6px 0 12px;outline:none}
+label{font-size:13px;color:var(--muted)}
+.profile{text-align:center;padding:20px}
+.avatar{width:65px;height:65px;margin:auto;border-radius:50%;background:#0b6077;display:grid;place-items:center;font-size:27px}
+footer{position:fixed;bottom:0;left:0;right:0;background:#09182a;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 4px calc(10px + env(safe-area-inset-bottom));z-index:10}
+footer button{background:none;border:0;color:var(--muted);font-size:12px}
+footer button.active{color:var(--cyan)}
+footer span{display:block;font-size:21px}
+.notice{font-size:12px;color:var(--muted);text-align:center;margin:20px 0}
+@media(min-width:600px){.package-list{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header>
+ <div class="top">
+  <div><div class="logo">MAHIM <span>UltraNet</span></div><div class="small">WiFi Complete Web Portal</div></div>
+  <div class="status">● ONLINE DEMO</div>
+ </div>
+</header>
+<main>
+<section id="home" class="panel active">
+ <div class="hero">
+  <div class="small">WELCOME TO</div>
+  <h1>Mahim UltraNet</h1>
+  <p>দ্রুত, নির্ভরযোগ্য ও সহজ ইন্টারনেট সেবা</p>
+  <span class="demo">PREMIUM DEMO VERSION</span>
+ </div>
+ <div class="grid">
+  <div class="card"><h3>আমার ওয়ালেট</h3><div class="big">৳ 0.00</div><div class="small">ডেমো ব্যালেন্স</div></div>
+  <div class="card"><h3>সক্রিয় প্যাকেজ</h3><div class="big">০</div><div class="small">কোনো প্যাকেজ চালু নেই</div></div>
+ </div>
+ <h2 class="section-title">দ্রুত সেবা</h2>
+ <div class="actions">
+  <div class="action" onclick="showPage('packages')"><b>📦</b>প্যাকেজ</div>
+  <div class="action" onclick="showPage('account')"><b>👤</b>অ্যাকাউন্ট</div>
+  <div class="action" onclick="alert('এটি ডেমো ফিচার।')"><b>💳</b>রিচার্জ</div>
+ </div>
+ <div class="info">✨ Mahim UltraNet-এ আপনাকে স্বাগতম। আপনার প্রয়োজন অনুযায়ী ইন্টারনেট প্যাকেজ বেছে নিন।</div>
+ <h2 class="section-title">PPPoE প্যাকেজ</h2>
+ <div class="card">
+  <div class="small">HOME INTERNET</div>
+  <strong class="big">৳ 400</strong>
+  <p>১০ Mbps · ৩০ দিন · আনলিমিটেড ডাটা</p>
+  <button class="primary" onclick="demo()">বিস্তারিত দেখুন</button>
+ </div>
+</section>
+
+<section id="packages" class="panel">
+ <h2 class="section-title">ইন্টারনেট প্যাকেজ</h2>
+ <div class="info">সব Hotspot প্যাকেজের গতি ৫ Mbps। প্যাকেজ কেনা বর্তমানে শুধু ডেমো।</div>
+ <div class="tabs">
+  <button class="tab active" onclick="filterPackages('hotspot',this)">Hotspot</button>
+  <button class="tab" onclick="filterPackages('pppoe',this)">PPPoE</button>
+ </div>
+ <div id="packageList" class="package-list"></div>
+</section>
+
+<section id="account" class="panel">
+ <h2 class="section-title">আমার অ্যাকাউন্ট</h2>
+ <div class="card profile">
+  <div class="avatar">👤</div>
+  <h2>স্বাগতম!</h2>
+  <p class="small">আপনার অ্যাকাউন্টে লগইন করুন</p>
+ </div>
+ <div class="card">
+  <h3>লগইন</h3>
+  <label>মোবাইল নম্বর</label>
+  <input type="tel" placeholder="01XXXXXXXXX">
+  <label>পাসওয়ার্ড</label>
+  <input type="password" placeholder="আপনার পাসওয়ার্ড">
+  <button class="primary" onclick="demo()">লগইন</button>
+  <p class="small">নতুন গ্রাহক? <a href="#" onclick="demo()" style="color:var(--cyan)">রেজিস্ট্রেশন</a></p>
+ </div>
+ <div class="card" style="margin-top:12px">
+  <h3>যোগাযোগ</h3>
+  <p>📞 01723054631</p>
+  <p>💬 WhatsApp: 01723054631</p>
+  <p>📍 পূর্ব শিকারপুর, খামার পাড়া</p>
+  <p>👨‍💼 অ্যাডমিন: মোহাম্মদ আবদুল মালেক হোসেন</p>
+  <button class="primary" onclick="window.open('https://wa.me/8801723054631','_blank')">WhatsApp যোগাযোগ</button>
+ </div>
+</section>
+<div class="notice">Mahim UltraNet · Premium Customer Portal<br>এই সংস্করণটি শুধুমাত্র ডিজাইন প্রিভিউ।</div>
+</main>
+
+<footer>
+ <button class="active" onclick="showPage('home',this)"><span>⌂</span>হোম</button>
+ <button onclick="showPage('packages',this)"><span>▦</span>প্যাকেজ</button>
+ <button onclick="showPage('account',this)"><span>♙</span>অ্যাকাউন্ট</button>
+</footer>
+<script>
+const hotspot=[
+[2,'৩০ মিনিট'],[4,'২ ঘণ্টা'],[6,'৫ ঘণ্টা'],[8,'৯ ঘণ্টা'],
+[10,'১২ ঘণ্টা'],[12,'১৪ ঘণ্টা'],[14,'১৬ ঘণ্টা'],[16,'১ দিন'],
+[18,'২ দিন'],[26,'৩ দিন'],[34,'৪ দিন'],[44,'৫ দিন'],
+[52,'৬ দিন'],[60,'৭ দিন'],[70,'৮ দিন'],[78,'৯ দিন'],
+[86,'১০ দিন'],[96,'১১ দিন'],[114,'১২ দিন'],[116,'১৩ দিন'],
+[118,'১৪ দিন'],[120,'১৫ দিন'],[122,'১৬ দিন'],[124,'১৭ দিন'],
+[126,'১৮ দিন'],[128,'১৯ দিন'],[130,'২০ দিন'],[132,'২১ দিন'],
+[134,'২২ দিন'],[136,'২৩ দিন'],[138,'২৪ দিন'],[140,'২৫ দিন'],
+[142,'২৬ দিন'],[144,'২৭ দিন'],[146,'২৮ দিন'],[148,'২৯ দিন'],
+[150,'১ মাস'],[280,'২ মাস'],[360,'৩ মাস'],[400,'৪ মাস']
+];
+function demo(){alert('এটি বর্তমানে ডেমো প্রিভিউ। বাস্তব লেনদেন বা অ্যাক্টিভেশন চালু নেই।');}
+function showPage(id,btn){
+ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ document.querySelectorAll('footer button').forEach(b=>b.classList.remove('active'));
+ if(btn)btn.classList.add('active');
+ else document.querySelectorAll('footer button')[['home','packages','account'].indexOf(id)].classList.add('active');
+ window.scrollTo(0,0);
+}
+function renderPackages(type){
+ const list=document.getElementById('packageList');
+ list.innerHTML='';
+ const items=type==='hotspot'?hotspot:[[400,'৩০ দিন · ১০ Mbps · আনলিমিটেড']];
+ items.forEach((p,i)=>{
+  const el=document.createElement('div');el.className='pkg';
+  el.innerHTML='<div class="small">'+(type==='hotspot'?'HOTSPOT PACKAGE':'PPPoE HOME INTERNET')+'</div><strong>৳ '+p[0]+'</strong><p>'+(type==='hotspot'?p[1]+' · ৫ Mbps':p[1])+'</p><button onclick="demo()">কিনুন</button>';
+  list.appendChild(el);
+ });
+}
+function filterPackages(type,btn){
+ document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+ btn.classList.add('active');renderPackages(type);
+}
+renderPackages('hotspot');
+</script>
+</body>
+</html>
