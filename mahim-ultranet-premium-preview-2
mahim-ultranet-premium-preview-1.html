@@ -1,0 +1,382 @@
+
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06152c">
+<title>Mahim UltraNet — Premium App</title>
+<style>
+:root{
+--bg:#06152c;--panel:#0b2040;--panel2:#102c50;
+--line:#174b78;--muted:#a5c0dc;--white:#f5faff;
+--cyan:#27e6f2;--blue:#168cff;--mint:#48edaa;--gold:#ffd34e
+}
+*{box-sizing:border-box}
+body{margin:0;background:#020a19;color:var(--white);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;line-height:1.45}
+button,input,select{font:inherit}
+.app{max-width:470px;min-height:100dvh;margin:auto;background:radial-gradient(ellipse at 50% 0%,#0874c755,transparent 42%),radial-gradient(ellipse at 100% 55%,#073e8055,transparent 40%),linear-gradient(160deg,#06152c,#071b37 55%,#06132a);padding-bottom:92px;overflow:hidden;position:relative;box-shadow:0 0 70px #0009}
+.top{padding:19px 19px 15px}
+.topline{display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;gap:10px;align-items:center}
+.logo{height:42px;width:42px;border-radius:15px;background:linear-gradient(145deg,#48f5f1,#168cff 70%);display:grid;place-items:center;color:#061322;font-size:22px;font-weight:1000;box-shadow:0 0 22px #16d9ef77}
+.brand b{font-size:15px;letter-spacing:.3px}
+.brand small{display:block;color:#a5c8e8;font-size:9px;letter-spacing:1.7px}
+.bell{height:39px;width:39px;border-radius:14px;background:#0d2a4c;border:1px solid #17609a;display:grid;place-items:center;font-size:17px;position:relative}
+.bell:after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;background:#ff7186;right:8px;top:7px}
+.welcome{margin-top:23px}
+.welcome small{color:#a5c6e4;font-size:12px}
+.welcome h1{font-size:23px;margin:4px 0 0;letter-spacing:-.4px}
+.welcome h1 span{background:linear-gradient(90deg,#fff,#42e8f2);color:transparent;background-clip:text}
+.screen{display:none;padding:0 16px 24px}
+.screen.active{display:block}
+
+/* Customer identity */
+.customer-strip{display:flex;align-items:center;gap:11px;padding:12px 13px;margin:3px 0 12px;border-radius:17px;background:linear-gradient(110deg,#0d3260,#092449);border:1px solid #167bb0;box-shadow:0 0 20px #087ed52b}
+.customer-avatar{width:43px;height:43px;border-radius:14px;background:linear-gradient(145deg,#22d8e9,#1678e8);display:grid;place-items:center;font-size:22px;flex-shrink:0}
+.customer-info{min-width:0;flex:1}
+.customer-info b{font-size:12px;display:block}
+.customer-info small{font-size:9px;color:#b4d4ef;display:block;margin-top:3px}
+.customer-id{font-size:9px;color:#6ee9f1;margin-top:2px}
+.customer-status{font-size:9px;color:#59f0ae;background:#063d39;border:1px solid #167c69;border-radius:20px;padding:5px 8px;white-space:nowrap}
+
+/* Premium wallet */
+.wallet{margin:4px 0 0;padding:17px;border-radius:23px;background:linear-gradient(125deg,#07558c 0%,#0755a4 48%,#263d9c 100%);position:relative;overflow:hidden;border:1px solid #3adff1;box-shadow:0 12px 30px #0877d54a,inset 0 0 24px #45eaff22}
+.wallet:before,.wallet:after{content:"";position:absolute;border:1px solid #ffffff28;border-radius:50%;width:210px;height:210px;right:-85px;top:-125px}
+.wallet:after{width:155px;height:155px;right:-56px;top:-96px}
+.wallet-layout{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:12px;position:relative;z-index:1}
+.wallet-main{min-width:0}
+.wallet-head{display:flex;justify-content:space-between;align-items:center;gap:5px}
+.wallet-head small{font-size:10px;color:#e0f8ff}
+.chip{font-size:9px;color:#e5fbff;background:#ffffff1c;border:1px solid #ffffff40;padding:5px 8px;border-radius:30px;white-space:nowrap}
+.balance{font-size:32px;font-weight:950;letter-spacing:-.7px;margin:10px 0 2px}
+.balance-sub{font-size:10px;color:#d0eaff}
+.wallet-actions{display:flex;gap:7px;margin-top:15px}
+.wallet-actions button{border:0;border-radius:10px;padding:9px 10px;font-size:10px;font-weight:850}
+.add{background:#f4ffff;color:#124c77}
+.trans{background:#ffffff1b;color:white;border:1px solid #ffffff45!important}
+.validity{border-left:1px solid #ffffff55;padding-left:11px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.validity-icon{font-size:27px;margin-bottom:4px;filter:drop-shadow(0 0 8px #56eaff)}
+.validity small{font-size:9px;color:#e1f5ff}
+.validity strong{font-size:19px;color:#57ffba;line-height:1.4}
+.validity span{font-size:9px;color:#e1f5ff}
+
+/* Section cards */
+.sec-head{display:flex;justify-content:space-between;align-items:center;margin:22px 2px 11px}
+.sec-head h2{font-size:15px;margin:0}
+.link{background:none;border:0;color:var(--cyan);font-size:10px;font-weight:750}
+.current{padding:16px;border-radius:19px;border:1px solid #1689b7;background:linear-gradient(140deg,#0b3851,#10294c 75%);position:relative;overflow:hidden;box-shadow:inset 0 0 20px #17c8e51a}
+.current:after{content:"";position:absolute;right:-37px;bottom:-85px;width:170px;height:170px;border:1px solid #5ce6df35;border-radius:50%;box-shadow:0 0 0 22px #5ce6df0c,0 0 0 44px #5ce6df08}
+.current-top{display:flex;justify-content:space-between;align-items:center}
+.current-top small{font-size:10px;color:#c4e4f4}
+.active{font-size:9px;color:#6df0bc;background:#064d3c;border:1px solid #218e6b;padding:5px 8px;border-radius:20px}
+.plan{font-size:19px;font-weight:850;margin:9px 0 2px}
+.plan-note{font-size:10px;color:#b2d0e2}
+.usage{margin-top:15px;position:relative;z-index:1}
+.usage-label{display:flex;justify-content:space-between;font-size:10px;color:#d0e7f5}
+.track{height:7px;background:#1c4661;border-radius:9px;margin-top:7px;overflow:hidden}
+.track i{display:block;width:62%;height:100%;background:linear-gradient(90deg,#28e9e8,#348cff);border-radius:9px;box-shadow:0 0 12px #28e9e8}
+.countrow{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px;position:relative;z-index:1}
+.count{background:#061a29a8;padding:10px 11px;border:1px solid #ffffff18;border-radius:12px}
+.count small{display:block;font-size:9px;color:#b0c9dc}
+.count b{font-size:15px;color:#72e8ee}
+.shortcuts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.shortcut{border:1px solid #176091;background:linear-gradient(145deg,#10365d,#0b2040);border-radius:15px;padding:12px 3px;text-align:center;color:#e8f6ff;font-size:9px;box-shadow:0 5px 14px #0003}
+.shortcut i{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;margin:0 auto 7px;background:linear-gradient(145deg,#125b82,#123d73);font-style:normal;font-size:18px;color:#54eaf2}
+.promo{margin-top:16px;padding:15px;border-radius:17px;background:linear-gradient(110deg,#102d65,#075b78);border:1px solid #238cc2;display:flex;align-items:center;justify-content:space-between;gap:9px;box-shadow:0 7px 20px #0003}
+.promo b{font-size:12px}
+.promo p{font-size:9px;color:#c2e4f5;margin:4px 0 0}
+.promo button{border:0;border-radius:10px;padding:9px 11px;background:linear-gradient(90deg,#38e6e9,#58aaff);color:#061624;font-weight:900;font-size:10px;white-space:nowrap}
+
+/* Package navigation and cards */
+.package-types{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+.package-type{border:1px solid #176b9a;border-radius:13px;padding:11px 7px;background:linear-gradient(120deg,#0c3156,#10264b);color:#b9d7ed;font-size:11px;font-weight:800}
+.package-type.selected{background:linear-gradient(100deg,#087c9c,#1759b8);border-color:#5ceafa;color:white;box-shadow:0 0 15px #16d9ef55}
+.filterrow{display:flex;gap:7px;overflow:auto;padding:2px 0 11px;scrollbar-width:none}
+.filterrow button{white-space:nowrap;border:1px solid #1b4c70;background:#102744;color:#b4cce1;border-radius:25px;padding:7px 12px;font-size:10px}
+.filterrow button.sel{background:#075c79;color:#8afaff;border-color:#27cde6}
+.search{width:100%;background:#0b2340;border:1px solid #1b5a83;padding:12px 13px;border-radius:12px;color:white;outline:none;margin:5px 0 12px;font-size:11px}
+.pkggrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pkg{background:linear-gradient(145deg,#102c4d,#0b1d36);border:1px solid #1b4c70;border-radius:16px;padding:13px;position:relative;overflow:hidden}
+.pkg.hot{border-color:#20c9e1;box-shadow:inset 0 0 0 1px #20c9e144,0 0 15px #0b9fce20}
+.pkg .pd{font-size:10px;color:#b0c9dc}
+.pkg .price{font-size:25px;font-weight:900;color:#55e8f1;margin:5px 0 1px}
+.pkg .desc{font-size:9px;color:#a0b8d0}
+.pkg button{width:100%;border:1px solid #176a8e;border-radius:10px;background:linear-gradient(100deg,#103d60,#124b72);color:#7bf2f4;font-size:10px;font-weight:850;padding:9px 4px;margin-top:11px}
+.pkg.hot button{background:linear-gradient(90deg,#31e2e6,#438cff);color:#061624;border:0}
+.pppoe-card{margin-top:12px;padding:15px;border:1px solid #2488b6;border-radius:17px;background:linear-gradient(120deg,#0b3b65,#153b83);box-shadow:0 8px 20px #0003}
+.pppoe-card .price{font-size:28px;font-weight:950;color:#ffdc68}
+.pppoe-card button{width:100%;border:0;border-radius:11px;padding:11px;background:linear-gradient(90deg,#39e4eb,#6ca6ff);color:#061624;font-weight:900;margin-top:12px}
+
+/* Account and bottom navigation */
+.account{display:flex;align-items:center;gap:13px;background:linear-gradient(120deg,#10365d,#0c2040);border:1px solid #1b5a83;padding:16px;border-radius:17px}
+.avatar{height:52px;width:52px;border-radius:17px;background:linear-gradient(140deg,#1686b6,#354fa0);display:grid;place-items:center;font-size:24px}
+.account b{font-size:14px}
+.account small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.verified{margin-left:auto;color:#65e2b1;font-size:9px;background:#65e2b115;border-radius:20px;padding:5px 8px}
+.menu{margin-top:13px;background:#0c2040;border:1px solid #19496d;border-radius:16px;overflow:hidden}
+.item{padding:14px 13px;display:flex;align-items:center;gap:11px;border-bottom:1px solid #1b3b5a;font-size:11px}
+.item:last-child{border:0}
+.item .ico{width:32px;height:32px;border-radius:11px;background:#12365b;display:grid;place-items:center;font-size:15px}
+.item .arr{margin-left:auto;color:#8cb1d1;font-size:18px}
+.bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(470px,100%);height:77px;padding:8px 20px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(100deg,#061a36f5,#092c50f5,#101f50f5);backdrop-filter:blur(18px);border-top:1px solid #1675a8;display:grid;grid-template-columns:repeat(3,1fr);z-index:10;box-shadow:0 -8px 25px #008ac522}
+.tab{border:0;background:none;color:#9ab3ce;font-size:10px;display:flex;align-items:center;justify-content:center;gap:5px;flex-direction:column}
+.tab i{font-style:normal;font-size:19px;line-height:1}
+.tab.active{color:#48f0f0}
+.tab.active i{filter:drop-shadow(0 0 8px #42e9f5)}
+.overlay{position:fixed;inset:0;background:#020611d9;display:none;align-items:flex-end;justify-content:center;z-index:30}
+.overlay.show{display:flex}
+.sheet{width:min(470px,100%);background:#102744;border:1px solid #28628b;border-radius:22px 22px 0 0;padding:20px 18px 30px}
+.sheet h3{margin:0 0 5px;font-size:17px}
+.sheet p{font-size:10px;color:#b2cbe1;margin:0 0 15px}
+.sheet label{font-size:10px;color:#b6c7dc}
+.sheet input,.sheet select{width:100%;margin:6px 0 12px;padding:12px;background:#081a30;border:1px solid #275477;border-radius:10px;color:white}
+.sheet .go{width:100%;padding:13px;border:0;border-radius:11px;background:linear-gradient(90deg,#35e6e9,#68a7ff);color:#061523;font-weight:900}
+.x{float:right;border:0;background:#263951;color:white;border-radius:50%;width:29px;height:29px}
+.toast{position:fixed;left:50%;bottom:89px;transform:translateX(-50%);background:#e9fdff;color:#071725;border-radius:11px;padding:10px 14px;font-size:11px;font-weight:800;display:none;z-index:50;width:max-content;max-width:90%;text-align:center}
+.fine{font-size:9px;color:#9ab2cc;text-align:center;margin:17px 4px 0}
+@media(min-width:471px){body{padding:18px 0}.app{border-radius:27px;min-height:calc(100dvh - 36px)}.bottom{bottom:18px;border-radius:0 0 27px 27px}}
+@media(max-width:360px){.wallet-layout{grid-template-columns:minmax(0,1fr) 94px}.balance{font-size:27px}.wallet{padding:13px}.chip{font-size:8px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+<div class="topline">
+<div class="brand"><div class="logo">M</div><div><b>Mahim UltraNet</b><small>SMART WIFI EXPERIENCE</small></div></div>
+<div class="bell">♧</div>
+</div>
+<div class="welcome"><small>আসসালামু আলাইকুম 👋</small><h1>স্বাগতম, <span>Mahim User</span></h1></div>
+</header>
+
+<main>
+<section class="screen active" id="home">
+
+<div class="customer-strip">
+<div class="customer-avatar">👤</div>
+<div class="customer-info">
+<b id="customerName">Mahim User</b>
+<small>☎ 01XXXXXXXXX</small>
+<div class="customer-id">Customer ID: MU-000128</div>
+</div>
+<span class="customer-status">● DEMO</span>
+</div>
+
+<div class="wallet">
+<div class="wallet-layout">
+<div class="wallet-main">
+<div class="wallet-head"><small>◈ &nbsp; WALLET BALANCE</small><span class="chip">● ACTIVE WALLET</span></div>
+<div class="balance" id="balance">৳১২০.০০</div>
+<div class="balance-sub">আপনার ব্যবহারযোগ্য ব্যালেন্স</div>
+<div class="wallet-actions">
+<button class="add" onclick="openRecharge()">＋ টাকা যোগ করুন</button>
+<button class="trans" onclick="toast('লেনদেনের ইতিহাস Backend যুক্ত হলে দেখা যাবে।')">↗ ইতিহাস</button>
+</div>
+</div>
+<div class="validity">
+<div class="validity-icon">◷</div>
+<small>প্যাকেজের মেয়াদ</small>
+<strong id="validity">৫ দিন</strong>
+<span>বাকি আছে</span>
+</div>
+</div>
+</div>
+
+<div class="sec-head"><h2>আপনার ইন্টারনেট</h2><button class="link" onclick="tab('packages')">সব প্যাকেজ দেখুন →</button></div>
+<div class="current">
+<div class="current-top"><small>চলমান প্যাকেজ</small><span class="active">● ACTIVE</span></div>
+<div class="plan" id="planName">৭ দিন • ৫ Mbps</div>
+<div class="plan-note" id="planMeta">৳৬০ প্যাকেজ • ডেমো অ্যাকাউন্ট</div>
+<div class="usage"><div class="usage-label"><span>প্যাকেজের মেয়াদ</span><span id="usageText">৬২% বাকি</span></div><div class="track"><i id="usageBar"></i></div></div>
+<div class="countrow">
+<div class="count"><small>অবশিষ্ট সময়</small><b id="remaining">৫ দিন ১২ ঘণ্টা</b></div>
+<div class="count"><small>মেয়াদ শেষ</small><b id="expires">১২ নভেম্বর</b></div>
+</div>
+</div>
+
+<div class="sec-head"><h2>দ্রুত সেবা</h2></div>
+<div class="shortcuts">
+<button class="shortcut" onclick="openRecharge()"><i>＋</i>রিচার্জ</button>
+<button class="shortcut" onclick="tab('packages')"><i>▤</i>প্যাকেজ</button>
+<button class="shortcut" onclick="toast('সাপোর্ট সেবা Backend যুক্ত হলে চালু হবে।')"><i>♧</i>সাপোর্ট</button>
+<button class="shortcut" onclick="toast('Emergency Internet Backend যুক্ত হলে চালু হবে।')"><i>ϟ</i>ইমার্জেন্সি</button>
+</div>
+
+<div class="promo"><div><b>আপনার পরের প্যাকেজ প্রস্তুত?</b><p>Wallet থেকে পছন্দের প্যাকেজ কিনুন।</p></div><button onclick="tab('packages')">Explore →</button></div>
+<p class="fine">এই স্ক্রিনের ব্যালেন্স ও প্যাকেজ নমুনা তথ্য। বাস্তব অ্যাকাউন্ট নয়।</p>
+</section>
+
+<section class="screen" id="packages">
+<div class="sec-head" style="margin-top:3px">
+<div><h2>ইন্টারনেট প্যাকেজ</h2><div style="font-size:10px;color:var(--muted);margin-top:4px">আপনার পছন্দের প্যাকেজ বেছে নিন</div></div>
+<span class="chip">৪০ HOTSPOT</span>
+</div>
+
+<div class="package-types">
+<button class="package-type selected" id="hotspotBtn" onclick="showPackageType('hotspot')">◈ Hotspot Packages</button>
+<button class="package-type" id="pppoeBtn" onclick="showPackageType('pppoe')">⌁ PPPoE Package</button>
+</div>
+
+<div id="hotspotArea">
+<div class="filterrow">
+<button class="sel" onclick="filterAll(this)">সব প্যাকেজ</button>
+<button onclick="filterShort(this)">স্বল্পমেয়াদি</button>
+<button onclick="filterLong(this)">দীর্ঘমেয়াদি</button>
+</div>
+<input class="search" id="search" placeholder="⌕  প্যাকেজ বা দাম দিয়ে খুঁজুন..." oninput="render()">
+<div class="pkggrid" id="pkgGrid"></div>
+</div>
+
+<div id="pppoeArea" style="display:none">
+<div class="pppoe-card">
+<div style="font-size:10px;color:#b9ddf4">⌁ HOME INTERNET · PPPoE</div>
+<div class="price">৳৪০০</div>
+<div style="font-size:13px;font-weight:800">৩০ দিন · ১০ Mbps</div>
+<p style="font-size:10px;color:#c3d9ed">আনলিমিটেড ডাটা · PPPoE সংযোগ</p>
+<button onclick="buy(400,'৩০ দিন • PPPoE ১০ Mbps')">PPPoE প্যাকেজ কিনুন →</button>
+</div>
+<p class="fine">PPPoE প্যাকেজটি Hotspot প্যাকেজ থেকে আলাদা।</p>
+</div>
+<p class="fine">কেনার ডেমোতে শুধু Preview-এর নমুনা Wallet পরিবর্তন হবে। বাস্তব প্যাকেজ চালু হয় না।</p>
+</section>
+
+<section class="screen" id="account">
+<div class="sec-head" style="margin-top:3px"><h2>আমার অ্যাকাউন্ট</h2><span class="chip">MY PROFILE</span></div>
+<div class="account">
+<div class="avatar">👤</div>
+<div><b>Mahim User</b><small>মোবাইল: 01XXXXXXXXX</small><small>Customer ID: MU-000128</small></div>
+<span class="verified">DEMO</span>
+</div>
+<div class="sec-head"><h2>অ্যাকাউন্ট সেটিংস</h2></div>
+<div class="menu">
+<div class="item" onclick="openRecharge()"><span class="ico">💳</span>ওয়ালেট ও রিচার্জ<span class="arr">›</span></div>
+<div class="item" onclick="toast('লেনদেনের ইতিহাস Backend যুক্ত হলে দেখা যাবে।')"><span class="ico">⇄</span>লেনদেনের ইতিহাস<span class="arr">›</span></div>
+<div class="item" onclick="toast('প্রোফাইল সম্পাদনা Backend যুক্ত হলে চালু হবে।')"><span class="ico">♙</span>ব্যক্তিগত তথ্য<span class="arr">›</span></div>
+<div class="item" onclick="toast('নিরাপদ লগইন Backend যুক্ত হলে চালু হবে।')"><span class="ico">♧</span>লগইন ও নিরাপত্তা<span class="arr">›</span></div>
+<div class="item" onclick="toast('অভিযোগ ব্যবস্থা Backend যুক্ত হলে চালু হবে।')"><span class="ico">☏</span>সাহায্য ও অভিযোগ<span class="arr">›</span></div>
+<div class="item" onclick="toast('নীতিমালা পৃষ্ঠা পরে যুক্ত করা হবে।')"><span class="ico">▤</span>শর্তাবলি ও গোপনীয়তা<span class="arr">›</span></div>
+</div>
+<p class="fine">বাস্তব গ্রাহক লগইন, Wallet ও ব্যক্তিগত তথ্য নিরাপদ Backend যুক্ত হওয়ার পর চালু হবে।</p>
+</section>
+</main>
+
+<nav class="bottom">
+<button class="tab active" data-id="home" onclick="tab('home')"><i>⌂</i>হোম</button>
+<button class="tab" data-id="packages" onclick="tab('packages')"><i>▦</i>প্যাকেজ</button>
+<button class="tab" data-id="account" onclick="tab('account')"><i>◉</i>অ্যাকাউন্ট</button>
+</nav>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)close()">
+<div class="sheet">
+<button class="x" onclick="close()">×</button>
+<h3 id="sheetTitle">ওয়ালেটে টাকা যোগ করুন</h3>
+<p id="sheetDesc">ডেমো ফর্ম — বাস্তব পেমেন্ট নয়।</p>
+<div id="sheetBody">
+<label>টাকার পরিমাণ</label><input id="amount" type="number" min="1" placeholder="যেমন ১০০">
+<label>পেমেন্ট মাধ্যম</label><select id="method"><option>bKash Personal Send Money</option><option>Nagad Personal Send Money</option></select>
+<label>Transaction ID</label><input placeholder="ডেমো Transaction ID">
+</div>
+<button class="go" id="sheetBtn" onclick="submit()">ডেমো ব্যালেন্স যোগ করুন</button>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const packs=[
+[2,'৩০ মিনিট'],[4,'২ ঘণ্টা'],[6,'৫ ঘণ্টা'],[8,'৯ ঘণ্টা'],
+[10,'১২ ঘণ্টা'],[12,'১৪ ঘণ্টা'],[14,'১৬ ঘণ্টা'],[16,'১ দিন'],
+[18,'২ দিন'],[26,'৩ দিন'],[34,'৪ দিন'],[44,'৫ দিন'],
+[52,'৬ দিন'],[60,'৭ দিন'],[70,'৮ দিন'],[78,'৯ দিন'],
+[86,'১০ দিন'],[96,'১১ দিন'],[114,'১২ দিন'],[116,'১৩ দিন'],
+[118,'১৪ দিন'],[120,'১৫ দিন'],[122,'১৬ দিন'],[124,'১৭ দিন'],
+[126,'১৮ দিন'],[128,'১৯ দিন'],[130,'২০ দিন'],[132,'২১ দিন'],
+[134,'২২ দিন'],[136,'২৩ দিন'],[138,'২৪ দিন'],[140,'২৫ দিন'],
+[142,'২৬ দিন'],[144,'২৭ দিন'],[146,'২৮ দিন'],[148,'২৯ দিন'],
+[150,'১ মাস'],[280,'২ মাস'],[360,'৩ মাস'],[400,'৪ মাস']
+];
+let wallet=120,chosen=null,filter='all',packageType='hotspot';
+const bn=n=>Number(n).toLocaleString('bn-BD');
+
+function tab(id){
+document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));
+document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.id===id));
+window.scrollTo({top:0,behavior:'smooth'});
+}
+function toast(s){
+let t=document.getElementById('toast');t.textContent=s;t.style.display='block';
+clearTimeout(window.tt);window.tt=setTimeout(()=>t.style.display='none',2600);
+}
+function showPackageType(type){
+packageType=type;
+document.getElementById('hotspotArea').style.display=type==='hotspot'?'block':'none';
+document.getElementById('pppoeArea').style.display=type==='pppoe'?'block':'none';
+document.getElementById('hotspotBtn').classList.toggle('selected',type==='hotspot');
+document.getElementById('pppoeBtn').classList.toggle('selected',type==='pppoe');
+}
+function render(){
+let q=(document.getElementById('search')?.value||'').toLowerCase();
+let arr=packs.map((p,i)=>({p:p[0],d:p[1],i})).filter(x=>
+(filter==='all'||(filter==='short'?x.i<16:x.i>=16))&&
+(!q||String(x.p).includes(q)||x.d.toLowerCase().includes(q))
+);
+document.getElementById('pkgGrid').innerHTML=arr.map(x=>
+`<article class="pkg ${x.i===13?'hot':''}">
+<div class="pd">${x.d} ইন্টারনেট</div>
+<div class="price">৳${bn(x.p)}</div>
+<div class="desc">৫ Mbps · ${x.i===13?'জনপ্রিয় প্যাকেজ':'Hotspot প্যাকেজ'}</div>
+<button onclick="buy(${x.p},'${x.d}')">প্যাকেজ কিনুন →</button>
+</article>`
+).join('')||'<p style="color:#9aacc0;font-size:12px">কোনো প্যাকেজ পাওয়া যায়নি।</p>';
+}
+function filterAll(b){filter='all';setFilter(b)}
+function filterShort(b){filter='short';setFilter(b)}
+function filterLong(b){filter='long';setFilter(b)}
+function setFilter(b){
+document.querySelectorAll('.filterrow button').forEach(x=>x.classList.remove('sel'));
+b.classList.add('sel');render();
+}
+function openRecharge(){
+chosen=null;
+document.getElementById('sheetTitle').textContent='ওয়ালেটে টাকা যোগ করুন';
+document.getElementById('sheetDesc').textContent='ডেমো ফর্ম — এখানে বাস্তব পেমেন্ট হবে না।';
+document.getElementById('sheetBody').innerHTML=
+'<label>টাকার পরিমাণ</label><input id="amount" type="number" min="1" placeholder="যেমন ১০০"><label>পেমেন্ট মাধ্যম</label><select id="method"><option>bKash Personal Send Money</option><option>Nagad Personal Send Money</option></select><label>Transaction ID</label><input placeholder="ডেমো Transaction ID">';
+document.getElementById('sheetBtn').textContent='ডেমো ব্যালেন্স যোগ করুন';
+document.getElementById('overlay').classList.add('show');
+}
+function buy(p,d){
+if(wallet<p){toast('পর্যাপ্ত ব্যালেন্স নেই। আগে রিচার্জ করুন।');return}
+chosen={p,d};
+document.getElementById('sheetTitle').textContent='প্যাকেজ নিশ্চিত করুন';
+document.getElementById('sheetDesc').textContent='নমুনা Wallet থেকে টাকা কাটা হবে; বাস্তব প্যাকেজ চালু হবে না।';
+document.getElementById('sheetBody').innerHTML=
+`<div style="padding:15px;background:#081a30;border-radius:12px;margin:7px 0 14px"><small style="color:#9aacc0">নির্বাচিত প্যাকেজ</small><div style="font-size:22px;font-weight:900;color:#66e5ec">${d}</div><b>৳${bn(p)}</b><div style="font-size:10px;color:#9aacc0;margin-top:5px">Wallet ব্যালেন্স: ৳${bn(wallet)}</div></div>`;
+document.getElementById('sheetBtn').textContent='নিশ্চিত করে কিনুন';
+document.getElementById('overlay').classList.add('show');
+}
+function close(){document.getElementById('overlay').classList.remove('show')}
+function submit(){
+if(chosen){
+if(wallet<chosen.p){toast('পর্যাপ্ত ব্যালেন্স নেই।');close();return}
+wallet-=chosen.p;
+document.getElementById('planName').textContent=chosen.d+' • ৫ Mbps';
+document.getElementById('planMeta').textContent='৳'+bn(chosen.p)+' প্যাকেজ • Preview ডেমো';
+document.getElementById('remaining').textContent=chosen.d;
+document.getElementById('validity').textContent=chosen.d;
+document.getElementById('expires').textContent='সক্রিয়করণের পর';
+document.getElementById('usageBar').style.width='100%';
+document.getElementById('usageText').textContent='১০০% বাকি';
+chosen=null;update();close();tab('home');
+toast('Preview-তে প্যাকেজ কেনা হয়েছে; বাস্তবে চালু হয়নি।');
+return;
+}
+let n=Number(document.getElementById('amount')?.value);
+if(!n||n<1){toast('সঠিক টাকার পরিমাণ লিখুন।');return}
+wallet+=n;update();close();toast('Preview Wallet-এ ৳'+bn(n)+' যোগ হয়েছে; বাস্তব পেমেন্ট নয়।');
+}
+function update(){document.getElementById('balance').textContent='৳'+bn(wallet)+'.০০'}
+render();
+</script>
+</body>
+</html>
