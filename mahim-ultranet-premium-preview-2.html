@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="bn">
 <head>
@@ -82,15 +83,6 @@ button,input,select{font:inherit}
 .shortcuts{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
 .shortcut{border:1px solid #176091;background:linear-gradient(145deg,#10365d,#0b2040);border-radius:15px;padding:12px 3px;text-align:center;color:#e8f6ff;font-size:9px;box-shadow:0 5px 14px #0003}
 .shortcut i{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;margin:0 auto 7px;background:linear-gradient(145deg,#125b82,#123d73);font-style:normal;font-size:18px;color:#54eaf2}
-
-/* Apps & Services */
-.apps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-.app-tile{border:1px solid #1b5b82;background:linear-gradient(145deg,#10365d,#0b2040);border-radius:15px;padding:13px 5px 11px;text-align:center;color:#eaf8ff;min-height:94px;cursor:pointer}
-.app-icon{width:37px;height:37px;border-radius:13px;background:linear-gradient(145deg,#12618a,#17417a);display:grid;place-items:center;margin:0 auto 7px;font-size:19px}
-.app-tile b{display:block;font-size:10px}
-.app-tile small{display:block;color:#9dbbd4;font-size:8px;margin-top:3px}
-.app-note{font-size:9px;color:#9ab2cc;text-align:center;margin:10px 4px 0}
-
 .promo{margin-top:16px;padding:15px;border-radius:17px;background:linear-gradient(110deg,#102d65,#075b78);border:1px solid #238cc2;display:flex;align-items:center;justify-content:space-between;gap:9px;box-shadow:0 7px 20px #0003}
 .promo b{font-size:12px}
 .promo p{font-size:9px;color:#c2e4f5;margin:4px 0 0}
@@ -159,6 +151,7 @@ button,input,select{font:inherit}
 
 <main>
 <section class="screen active" id="home">
+
 <div class="customer-strip">
 <div class="customer-avatar">👤</div>
 <div class="customer-info">
@@ -209,33 +202,6 @@ button,input,select{font:inherit}
 <button class="shortcut" onclick="toast('Emergency Internet Backend যুক্ত হলে চালু হবে।')"><i>ϟ</i>ইমার্জেন্সি</button>
 </div>
 
-<!-- Apps & Services -->
-<div class="sec-head">
-<h2>Apps &amp; Services</h2>
-<span class="chip">FREE SERVICES</span>
-</div>
-<div class="apps-grid">
-<button class="app-tile" onclick="toast('Wallet Backend যুক্ত হলে চালু হবে।')">
-<span class="app-icon">৳</span><b>Wallet</b><small>ব্যালেন্স ও হিসাব</small>
-</button>
-<button class="app-tile" onclick="toast('Transaction History Backend যুক্ত হলে চালু হবে।')">
-<span class="app-icon">⇄</span><b>Transaction</b><small>লেনদেনের ইতিহাস</small>
-</button>
-<button class="app-tile" onclick="toast('Usage Report Router সংযোগের পর চালু হবে।')">
-<span class="app-icon">▥</span><b>Usage Report</b><small>ইন্টারনেট ব্যবহার</small>
-</button>
-<button class="app-tile" onclick="toast('Customer Support Backend যুক্ত হলে চালু হবে।')">
-<span class="app-icon">🎧</span><b>Support</b><small>অভিযোগ ও সহায়তা</small>
-</button>
-<button class="app-tile" onclick="window.open('https://wa.me/8801723054631','_blank','noopener')">
-<span class="app-icon">☏</span><b>WhatsApp</b><small>সরাসরি যোগাযোগ</small>
-</button>
-<button class="app-tile" onclick="toast('Notifications Backend যুক্ত হলে চালু হবে।')">
-<span class="app-icon">♧</span><b>Notifications</b><small>নতুন আপডেট</small>
-</button>
-</div>
-<p class="app-note">বাস্তব সুবিধাগুলোর জন্য Backend ও MikroTik সংযোগ প্রয়োজন।</p>
-
 <div class="promo"><div><b>আপনার পরের প্যাকেজ প্রস্তুত?</b><p>Wallet থেকে পছন্দের প্যাকেজ কিনুন।</p></div><button onclick="tab('packages')">Explore →</button></div>
 <p class="fine">এই স্ক্রিনের ব্যালেন্স ও প্যাকেজ নমুনা তথ্য। বাস্তব অ্যাকাউন্ট নয়।</p>
 </section>
@@ -245,10 +211,12 @@ button,input,select{font:inherit}
 <div><h2>ইন্টারনেট প্যাকেজ</h2><div style="font-size:10px;color:var(--muted);margin-top:4px">আপনার পছন্দের প্যাকেজ বেছে নিন</div></div>
 <span class="chip">৪০ HOTSPOT</span>
 </div>
+
 <div class="package-types">
 <button class="package-type selected" id="hotspotBtn" onclick="showPackageType('hotspot')">◈ Hotspot Packages</button>
 <button class="package-type" id="pppoeBtn" onclick="showPackageType('pppoe')">⌁ PPPoE Package</button>
 </div>
+
 <div id="hotspotArea">
 <div class="filterrow">
 <button class="sel" onclick="filterAll(this)">সব প্যাকেজ</button>
@@ -258,6 +226,7 @@ button,input,select{font:inherit}
 <input class="search" id="search" placeholder="⌕  প্যাকেজ বা দাম দিয়ে খুঁজুন..." oninput="render()">
 <div class="pkggrid" id="pkgGrid"></div>
 </div>
+
 <div id="pppoeArea" style="display:none">
 <div class="pppoe-card">
 <div style="font-size:10px;color:#b9ddf4">⌁ HOME INTERNET · PPPoE</div>
@@ -327,7 +296,7 @@ const packs=[
 [150,'১ মাস'],[280,'২ মাস'],[360,'৩ মাস'],[400,'৪ মাস']
 ];
 let
-  wallet=120,chosen=null,filter='all',packageType='hotspot';
+wallet=120,chosen=null,filter='all',packageType='hotspot';
 const bn=n=>Number(n).toLocaleString('bn-BD');
 
 function tab(id){
@@ -371,7 +340,7 @@ b.classList.add('sel');render();
 function openRecharge(){
 chosen=null;
 document.getElementById('sheetTitle').textContent='ওয়ালেটে টাকা যোগ করুন';
-document.getElementById('sheetDesc').textContent='ডেমো ফর্ম — এখানে বাস্তব পেমেন্ট হবে না।';
+  document.getElementById('sheetDesc').textContent='ডেমো ফর্ম — এখানে বাস্তব পেমেন্ট হবে না।';
 document.getElementById('sheetBody').innerHTML=
 '<label>টাকার পরিমাণ</label><input id="amount" type="number" min="1" placeholder="যেমন ১০০"><label>পেমেন্ট মাধ্যম</label><select id="method"><option>bKash Personal Send Money</option><option>Nagad Personal Send Money</option></select><label>Transaction ID</label><input placeholder="ডেমো Transaction ID">';
 document.getElementById('sheetBtn').textContent='ডেমো ব্যালেন্স যোগ করুন';
@@ -393,7 +362,7 @@ if(chosen){
 if(wallet<chosen.p){toast('পর্যাপ্ত ব্যালেন্স নেই।');close();return}
 wallet-=chosen.p;
 document.getElementById('planName').textContent=chosen.d+' • ৫ Mbps';
-  document.getElementById('planMeta').textContent='৳'+bn(chosen.p)+' প্যাকেজ • Preview ডেমো';
+document.getElementById('planMeta').textContent='৳'+bn(chosen.p)+' প্যাকেজ • Preview ডেমো';
 document.getElementById('remaining').textContent=chosen.d;
 document.getElementById('validity').textContent=chosen.d;
 document.getElementById('expires').textContent='সক্রিয়করণের পর';
