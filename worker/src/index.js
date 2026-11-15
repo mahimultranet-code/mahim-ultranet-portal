@@ -483,7 +483,7 @@ export default {
         const rawLimit = Number(url.searchParams.get("limit") || 20);
         const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 20;
         const result = await env.DB.prepare(
-          "SELECT id, method, sender_mobile, transaction_id, amount_taka, status, created_at FROM payment_requests WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
+          "SELECT p.id, p.method, p.sender_mobile, p.transaction_id, p.amount_taka, p.status, p.created_at, COALESCE(t.amount_taka, 0) AS debt_paid_taka, p.amount_taka - COALESCE(t.amount_taka, 0) AS wallet_credited_taka FROM payment_requests p LEFT JOIN emergency_debt_transactions t ON t.payment_id = p.id WHERE p.customer_id = ? ORDER BY p.id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, payments: result.results || [] }, 200, cors);
       }
@@ -820,7 +820,10 @@ export default {
           ]);
           const changed = Number(results?.[0]?.meta?.changes || 0);
           if (changed !== 1) return fail("payment_not_pending_or_not_found", 409, cors);
-          return json({ ok: true, payment_id: paymentId, status: "approved" }, 200, cors);
+          const settlement = await env.DB.prepare(
+            "SELECT p.amount_taka, COALESCE(t.amount_taka, 0) AS debt_paid_taka, p.amount_taka - COALESCE(t.amount_taka, 0) AS wallet_credited_taka FROM payment_requests p LEFT JOIN emergency_debt_transactions t ON t.payment_id = p.id WHERE p.id = ?",
+          ).bind(paymentId).first();
+          return json({ ok: true, payment_id: paymentId, status: "approved", debt_paid_taka: Number(settlement?.debt_paid_taka || 0), wallet_credited_taka: Number(settlement?.wallet_credited_taka || 0) }, 200, cors);
         }
 
         const results = await env.DB.batch([
