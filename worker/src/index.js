@@ -724,8 +724,8 @@ export default {
         const results = await env.DB.batch([
           env.DB.prepare("UPDATE customers SET password_hash = ? WHERE id = (SELECT customer_id FROM password_reset_requests WHERE id = ? AND status = 'pending')").bind(passwordHash, resetId),
           env.DB.prepare("UPDATE password_reset_requests SET status = 'resolved', admin_note = 'Password reset completed; administrator must share the new password securely' WHERE id = ? AND status = 'pending' AND changes() = 1").bind(resetId),
+          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'password_reset_completed', 'reset_request_id=' || ? WHERE changes() = 1").bind(admin.id, resetId),
           env.DB.prepare("DELETE FROM sessions WHERE customer_id = (SELECT customer_id FROM password_reset_requests WHERE id = ? AND status = 'resolved') AND changes() = 1").bind(resetId),
-          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'password_reset_completed', 'reset_request_id=' || ? WHERE EXISTS (SELECT 1 FROM password_reset_requests WHERE id = ? AND status = 'resolved')").bind(admin.id, resetId, resetId),
         ]);
         if (Number(results?.[0]?.meta?.changes || 0) !== 1 || Number(results?.[1]?.meta?.changes || 0) !== 1) return fail("reset_request_not_pending_or_not_found", 409, cors);
         return json({ ok: true, reset_request_id: resetId, status: "resolved", sessions_revoked: true, message: "share_the_new_password_with_customer_securely" }, 200, cors);
