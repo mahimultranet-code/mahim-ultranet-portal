@@ -252,7 +252,7 @@ export default {
       if (url.pathname === "/password-reset/request" && request.method === "POST") {
         const body = await readJson(request);
         const mobile = typeof body.mobile === "string" ? body.mobile.trim() : "";
-        if (!/^01[3-9]\\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
+        if (!/^01[3-9]\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
         if (!(await rateLimit(env.DB, request, "password-reset-request", mobile))) return fail("too_many_attempts", 429, cors);
         await env.DB.prepare(
           "INSERT INTO password_reset_requests (customer_id, status) SELECT id, 'pending' FROM customers WHERE mobile = ? AND role = 'customer' AND NOT EXISTS (SELECT 1 FROM password_reset_requests WHERE customer_id = customers.id AND status = 'pending')",
