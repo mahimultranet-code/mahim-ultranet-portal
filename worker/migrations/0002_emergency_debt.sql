@@ -24,3 +24,6 @@ ON emergency_requests(customer_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_payment_requests_customer_status
 ON payment_requests(customer_id, status);
+
+-- Carry forward the new fee for any legacy pending requests created before this migration.
+UPDATE emergency_requests SET fee_taka = 20 WHERE status = 'pending';
