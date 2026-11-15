@@ -8,7 +8,7 @@ SELECT 2 AS price_taka, '৩০ মিনিট' AS duration, 30 AS duration_min
 UNION ALL
 SELECT 4 AS price_taka, '২ ঘণ্টা' AS duration, 120 AS duration_minutes
 UNION ALL
-SELECT 6 AS price_taka, '৫ ঘণ্টা' AS duration, 300 AS duration_minutes
+SELECT 20 AS price_taka, '৫ ঘণ্টা' AS duration, 300 AS duration_minutes
 UNION ALL
 SELECT 8 AS price_taka, '৯ ঘণ্টা' AS duration, 540 AS duration_minutes
 UNION ALL
