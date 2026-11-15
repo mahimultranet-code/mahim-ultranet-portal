@@ -689,7 +689,7 @@ export default {
             ).bind(admin.id, requestId),
           ]);
           if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_eligible_or_debt_exists", 409, cors);
-          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, activation_status: "pending_routeros_verification" }, 200, cors);
+          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, duration_minutes: 300, duration_hours: 5, activation_status: "pending_routeros_verification" }, 200, cors);
         }
         const results = await env.DB.batch([
           env.DB.prepare("UPDATE emergency_requests SET status = 'rejected' WHERE id = ? AND status = 'pending'").bind(requestId),
