@@ -1,34 +1,50 @@
 # Mahim UltraNet Worker API
 
-This folder contains the Cloudflare Worker source for the customer portal API.
+Cloudflare Worker source for the Mahim UltraNet customer portal.
 
-## Current stage
+## Implemented in this feature branch
 
-The Worker source now includes a read-only health endpoint, customer authentication routes (registration, login, current-session lookup, logout), an authenticated wallet balance endpoint, authenticated customer-scoped wallet transaction history, a public active-package catalogue, and authenticated payment submission/history endpoints. Payment submissions are always pending and do not credit a wallet. Passwords use PBKDF2-SHA-256; sessions use random bearer secrets stored only as SHA-256 hashes and are delivered in Secure, HttpOnly cookies. Registration creates a zero-balance wallet. CORS is restricted to the exact GitHub Pages origin. Wallet balance changes are currently limited to the admin payment-approval flow. Admins can list payment requests and approve/reject pending requests. Approval uses a D1 batch, a unique ledger reference, and a guarded balance update to prevent duplicate credits. Authenticated package purchase now uses server-side active-package pricing, a required idempotency key, a D1 batch ledger debit, and creates a customer package with `pending` status. Customer package history is available. No package is marked active by this API. The admin dashboard summary and customer directory/search endpoints are implemented. Admins can review payment requests, see pending workload counts, and search customers with wallet balances. Customer complaint submission/history and admin complaint queues/replies are implemented. Admin package catalogue management is implemented: admins can list all packages and create or update/disable packages with validated prices, durations, speeds, service types, and audit-log entries. MikroTik commands are not implemented.
+- GET /health checks the D1 binding.
+- Customer registration, login, current-session lookup, and logout.
+- PBKDF2-SHA-256 password hashing and random session tokens stored as SHA-256 hashes.
+- Secure, HttpOnly session cookies; exact-origin CORS for the GitHub Pages portal.
+- Authenticated wallet balance and customer-scoped transaction history.
+- Public active package catalogue and authenticated package purchase using server-side pricing, an idempotency key, and a guarded wallet debit.
+- Package purchase creates a pending customer order. This API does not activate a RouterOS service.
+- bKash/Nagad payment request submission and customer payment history. Requests stay pending until an admin verifies them.
+- One-time admin bootstrap protected by the existing ADMIN_SETUP_SECRET Worker secret.
+- Admin dashboard, customer directory/search, payment queue with approve/reject, complaint queue/replies, and package catalogue create/update/enable/disable.
+- Read-only admin package-order queue at GET /admin/package-orders?status=pending. Supported status filters: pending, active, expired, and rejected.
+- Admin actions write audit-log entries where implemented.
 
 ## Deploy prerequisites
 
-- Cloudflare Worker: `mahim-ultranet-api-v2`
-- Existing D1 binding name: `DB`
-- Existing D1 database: `mahim-ultranet-db`
-- Keep the existing `ADMIN_SETUP_SECRET` secret private.
-- Do not enable RouterOS API-SSL or expose router management ports.
+- Existing Worker: mahim-ultranet-api-v2
+- D1 binding name: DB
+- Existing D1 database: mahim-ultranet-db
+- Existing secret: ADMIN_SETUP_SECRET (keep private; never paste it into chat or the portal).
+- Keep RouterOS management ports private. Do not enable public RouterOS API-SSL.
 
-## Health check
+## Deployment and verification
 
-After deploying this source to the existing Worker, request:
+The source in this repository is not automatically deployed to Cloudflare. The live Worker previously returned Hello World!; that response is not evidence that this API has been deployed.
 
-`GET /health`
+After deploying the feature-branch Worker source manually:
 
-A healthy response includes `ok: true` and a successful D1 connectivity check. Until this source is deployed, the current `Hello World!` response is not proof that the API is live.
+1. Call GET /health and confirm D1 connectivity.
+2. Confirm the database schema and required unique wallet transaction reference index.
+3. Perform the one-time admin bootstrap securely, using the Worker secret without exposing it.
+4. Test admin login/session, customer registration/login, customer isolation, wallet reads, payment submission, approval/rejection, package purchase idempotency, complaints, package management, and package-order visibility.
+5. Test cookies in Android Chrome. GitHub Pages and workers.dev are cross-site; third-party cookie restrictions may prevent sessions. A same-site custom API domain may be needed.
+6. Only after all tests pass should real customer payments be accepted.
 
-## Next implementation gates
+## Safety gates
 
-1. Verify health and D1 connectivity on the deployed Worker.
-2. Deploy and test the one-time admin bootstrap using the existing Worker secret, then authentication, wallet reads, customer-isolated histories, package catalogue/purchase, pending payment submissions, and admin approval/rejection. Verify D1 batch semantics, idempotency, and duplicate-credit/debit behavior before accepting real payments.
-3. Implement payment requests and admin approval with atomic wallet ledger updates.
-4. Implement package purchase with server-side price lookup and idempotency.
-5. Build the admin UI for package creation, editing, and enable/disable controls using the new admin package endpoints.
-6. Implement the MikroTik outbound polling bridge only after command authentication, allowlisting, expiry, retry handling, and router-side verification are complete.
+- Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with a unique ledger reference and guarded balance update.
+- Package purchase debits the wallet and creates a pending order. It does not activate internet access.
+- The admin package-order endpoint is read-only. No manual action in the portal may mark an order active before RouterOS activation and verification exist.
+- Emergency Internet/debt accounting is not implemented.
+- MikroTik outbound polling/command execution is not implemented. Before implementation, require command authentication, strict allowlisting, expiry, replay protection, retries, and router-side verification.
+- Never expose RouterOS management ports or credentials to the public internet.
 
-Authentication source is committed to the feature branch only and has not been deployed. No package or emergency session may be marked active until RouterOS execution and reporting have been tested end-to-end.
+All work remains on the feature branch until end-to-end testing and review are complete.
