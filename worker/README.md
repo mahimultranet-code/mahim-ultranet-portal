@@ -4,7 +4,7 @@ This folder contains the Cloudflare Worker source for the customer portal API.
 
 ## Current stage
 
-Only the read-only health endpoint is implemented in this first commit. It does not authenticate customers, change wallet balances, approve payments, or issue MikroTik commands.
+The Worker source now includes a read-only health endpoint and customer authentication routes: registration, login, current-session lookup, and logout. Passwords use PBKDF2-SHA-256; sessions use random bearer secrets stored only as SHA-256 hashes and are delivered in Secure, HttpOnly cookies. Registration creates a zero-balance wallet. CORS is restricted to the exact GitHub Pages origin. Wallet changes, payment approvals, package activation, admin APIs, and MikroTik commands are not implemented.
 
 ## Deploy prerequisites
 
@@ -25,9 +25,9 @@ A healthy response includes `ok: true` and a successful D1 connectivity check. U
 ## Next implementation gates
 
 1. Verify health and D1 connectivity on the deployed Worker.
-2. Implement customer registration/login, password hashing, session expiry, rate limiting, and customer-isolated reads.
+2. Deploy and test the new authentication routes from the GitHub Pages origin, including cookie behavior on Android browsers and D1 wallet creation.
 3. Implement payment requests and admin approval with atomic wallet ledger updates.
 4. Implement package purchase with server-side price lookup and idempotency.
 5. Implement the MikroTik outbound polling bridge only after command authentication, allowlisting, expiry, retry handling, and router-side verification are complete.
 
-No package or emergency session may be marked active until RouterOS execution and reporting have been tested end-to-end.
+Authentication source is committed to the feature branch only and has not been deployed. No package or emergency session may be marked active until RouterOS execution and reporting have been tested end-to-end.
