@@ -187,7 +187,7 @@ export default {
     }
 
     const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap"].includes(url.pathname) && !adminPaymentAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers"].includes(url.pathname) && !adminPaymentAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -469,6 +469,44 @@ export default {
           "SELECT id, method, sender_mobile, transaction_id, amount_taka, status, created_at FROM payment_requests WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, payments: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/dashboard" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const [customers, pendingPayments, pendingPackages, pendingComplaints, pendingEmergency, walletTotal] = await Promise.all([
+          env.DB.prepare("SELECT COUNT(*) AS total FROM customers WHERE role = 'customer'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS total FROM payment_requests WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS total FROM customer_packages WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS total FROM complaints WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS total FROM emergency_requests WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COALESCE(SUM(balance_taka), 0) AS total FROM wallets").first(),
+        ]);
+        return json({
+          ok: true,
+          summary: {
+            total_customers: Number(customers?.total || 0),
+            pending_payments: Number(pendingPayments?.total || 0),
+            pending_package_orders: Number(pendingPackages?.total || 0),
+            pending_complaints: Number(pendingComplaints?.total || 0),
+            pending_emergency_requests: Number(pendingEmergency?.total || 0),
+            wallet_balance_total_taka: Number(walletTotal?.total || 0),
+          },
+        }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/customers" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const search = (url.searchParams.get("q") || "").trim().slice(0, 80);
+        const rawLimit = Number(url.searchParams.get("limit") || 50);
+        const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+        const result = await env.DB.prepare(
+          "SELECT c.id, c.name, c.mobile, c.email, c.is_verified, c.mikrotik_username, c.created_at, COALESCE(w.balance_taka, 0) AS balance_taka FROM customers c LEFT JOIN wallets w ON w.customer_id = c.id WHERE c.role = 'customer' AND (? = '' OR c.name LIKE '%' || ? || '%' OR c.mobile LIKE '%' || ? || '%') ORDER BY c.id DESC LIMIT ?",
+        ).bind(search, search, search, limit).all();
+        return json({ ok: true, customers: result.results || [] }, 200, cors);
       }
 
       if (url.pathname === "/admin/payments" && request.method === "GET") {
