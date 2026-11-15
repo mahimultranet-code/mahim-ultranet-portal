@@ -25,7 +25,7 @@ A healthy response includes `ok: true` and a successful D1 connectivity check. U
 ## Next implementation gates
 
 1. Verify health and D1 connectivity on the deployed Worker.
-2. Deploy and test authentication, wallet reads, customer-isolated histories, package catalogue/purchase, pending payment submissions, and admin approval/rejection from the GitHub Pages origin. Verify D1 batch semantics, idempotency, and duplicate-credit/debit behavior before accepting real payments.
+2. Deploy and test the one-time admin bootstrap using the existing Worker secret, then authentication, wallet reads, customer-isolated histories, package catalogue/purchase, pending payment submissions, and admin approval/rejection. Verify D1 batch semantics, idempotency, and duplicate-credit/debit behavior before accepting real payments.
 3. Implement payment requests and admin approval with atomic wallet ledger updates.
 4. Implement package purchase with server-side price lookup and idempotency.
 5. Implement the MikroTik outbound polling bridge only after command authentication, allowlisting, expiry, retry handling, and router-side verification are complete.
