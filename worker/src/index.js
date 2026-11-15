@@ -735,12 +735,14 @@ export default {
         const admin = await getSessionCustomer(env.DB, request);
         if (!admin) return fail("unauthorized", 401, cors);
         if (admin.role !== "admin") return fail("forbidden", 403, cors);
-        const [customers, pendingPayments, pendingPackages, pendingComplaints, pendingEmergency, walletTotal] = await Promise.all([
+        const [customers, pendingPayments, pendingPackages, pendingComplaints, pendingEmergency, pendingPasswordResets, emergencyDebtTotal, walletTotal] = await Promise.all([
           env.DB.prepare("SELECT COUNT(*) AS total FROM customers WHERE role = 'customer'").first(),
           env.DB.prepare("SELECT COUNT(*) AS total FROM payment_requests WHERE status = 'pending'").first(),
           env.DB.prepare("SELECT COUNT(*) AS total FROM customer_packages WHERE status = 'pending'").first(),
           env.DB.prepare("SELECT COUNT(*) AS total FROM complaints WHERE status = 'pending'").first(),
           env.DB.prepare("SELECT COUNT(*) AS total FROM emergency_requests WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COUNT(*) AS total FROM password_reset_requests WHERE status = 'pending'").first(),
+          env.DB.prepare("SELECT COALESCE(SUM(amount_due_taka), 0) AS total FROM emergency_debts").first(),
           env.DB.prepare("SELECT COALESCE(SUM(balance_taka), 0) AS total FROM wallets").first(),
         ]);
         return json({
@@ -751,6 +753,8 @@ export default {
             pending_package_orders: Number(pendingPackages?.total || 0),
             pending_complaints: Number(pendingComplaints?.total || 0),
             pending_emergency_requests: Number(pendingEmergency?.total || 0),
+            pending_password_resets: Number(pendingPasswordResets?.total || 0),
+            emergency_debt_total_taka: Number(emergencyDebtTotal?.total || 0),
             wallet_balance_total_taka: Number(walletTotal?.total || 0),
           },
         }, 200, cors);
