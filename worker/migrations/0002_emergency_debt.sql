@@ -27,3 +27,11 @@ ON payment_requests(customer_id, status);
 
 -- Carry forward the new fee for any legacy pending requests created before this migration.
 UPDATE emergency_requests SET fee_taka = 20 WHERE status = 'pending';
+
+-- Enforce the approved flat fee even for future inserts made outside the portal API.
+CREATE TRIGGER IF NOT EXISTS trg_emergency_requests_fee_20
+AFTER INSERT ON emergency_requests
+WHEN NEW.fee_taka <> 20
+BEGIN
+  UPDATE emergency_requests SET fee_taka = 20 WHERE id = NEW.id;
+END;
