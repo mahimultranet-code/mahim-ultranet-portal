@@ -186,8 +186,10 @@ export default {
       }
     }
 
-    const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers"].includes(url.pathname) && !adminPaymentAction) {
+    const adminPaymentAction = url.pathname.match(/^\\/admin\\/payments\\/(\\d+)\\/(approve|reject)$/);
+    const adminComplaintReply = url.pathname.match(/^\\/admin\\/complaints\\/(\\d+)\\/reply$/);
+    const adminComplaintAllowed = Boolean(adminComplaintReply);
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -469,6 +471,71 @@ export default {
           "SELECT id, method, sender_mobile, transaction_id, amount_taka, status, created_at FROM payment_requests WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, payments: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/complaints" && request.method === "POST") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const body = await readJson(request);
+        const subject = typeof body.subject === "string" ? body.subject.trim() : "";
+        const message = typeof body.message === "string" ? body.message.trim() : "";
+        if (subject.length < 3 || subject.length > 120) return fail("invalid_subject", 400, cors);
+        if (message.length < 10 || message.length > 2000) return fail("invalid_message", 400, cors);
+        if (!(await rateLimit(env.DB, request, "complaint", String(customer.id)))) {
+          return fail("too_many_attempts", 429, cors);
+        }
+        const inserted = await env.DB.prepare(
+          "INSERT INTO complaints (customer_id, subject, message, status) VALUES (?, ?, ?, 'pending')",
+        ).bind(customer.id, subject, message).run();
+        return json({ ok: true, complaint_id: Number(inserted.meta?.last_row_id), status: "pending" }, 201, cors);
+      }
+
+      if (url.pathname === "/complaints/mine" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 30);
+        const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 30;
+        const result = await env.DB.prepare(
+          "SELECT id, subject, message, status, admin_reply, created_at FROM complaints WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
+        ).bind(customer.id, limit).all();
+        return json({ ok: true, complaints: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/complaints" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const status = url.searchParams.get("status") || "pending";
+        if (!["pending", "in_progress", "resolved"].includes(status)) return fail("invalid_status", 400, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 50);
+        const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+        const result = await env.DB.prepare(
+          "SELECT x.id, x.customer_id, c.name AS customer_name, c.mobile AS customer_mobile, x.subject, x.message, x.status, x.admin_reply, x.created_at FROM complaints x JOIN customers c ON c.id = x.customer_id WHERE x.status = ? ORDER BY x.id DESC LIMIT ?",
+        ).bind(status, limit).all();
+        return json({ ok: true, complaints: result.results || [] }, 200, cors);
+      }
+
+      if (adminComplaintReply && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const complaintId = Number(adminComplaintReply[1]);
+        if (!Number.isSafeInteger(complaintId) || complaintId < 1) return fail("invalid_complaint_id", 400, cors);
+        const body = await readJson(request);
+        const reply = typeof body.reply === "string" ? body.reply.trim() : "";
+        const status = typeof body.status === "string" ? body.status : "resolved";
+        if (reply.length < 2 || reply.length > 2000) return fail("invalid_reply", 400, cors);
+        if (!["in_progress", "resolved"].includes(status)) return fail("invalid_status", 400, cors);
+        const results = await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE complaints SET admin_reply = ?, status = ? WHERE id = ?",
+          ).bind(reply, status, complaintId),
+          env.DB.prepare(
+            "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'complaint_replied', 'complaint_id=' || ? WHERE changes() = 1",
+          ).bind(admin.id, complaintId),
+        ]);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("complaint_not_found", 404, cors);
+        return json({ ok: true, complaint_id: complaintId, status }, 200, cors);
       }
 
       if (url.pathname === "/admin/dashboard" && request.method === "GET") {
