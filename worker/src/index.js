@@ -187,7 +187,7 @@ export default {
     }
 
     const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments"].includes(url.pathname) && !adminPaymentAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine"].includes(url.pathname) && !adminPaymentAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -282,6 +282,75 @@ export default {
         const result = await env.DB.prepare(
           "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE is_active = 1 ORDER BY price_taka ASC, id ASC",
         ).all();
+        return json({ ok: true, packages: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/packages/purchase" && request.method === "POST") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const body = await readJson(request);
+        const packageId = Number(body.package_id);
+        const idempotencyKey = request.headers.get("Idempotency-Key") || body.idempotency_key || "";
+        if (!Number.isSafeInteger(packageId) || packageId < 1) return fail("invalid_package_id", 400, cors);
+        if (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9_-]{16,80}$/.test(idempotencyKey)) {
+          return fail("valid_idempotency_key_required", 400, cors);
+        }
+        if (!(await rateLimit(env.DB, request, "package-purchase", String(customer.id)))) {
+          return fail("too_many_attempts", 429, cors);
+        }
+        const pkg = await env.DB.prepare(
+          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE id = ? AND is_active = 1 LIMIT 1",
+        ).bind(packageId).first();
+        if (!pkg) return fail("package_not_available", 404, cors);
+        const reference = "pkg:" + customer.id + ":" + idempotencyKey;
+        const existing = await env.DB.prepare(
+          "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? AND reference = ? LIMIT 1",
+        ).bind(customer.id, reference).first();
+        if (existing) {
+          return json({ ok: true, replayed: true, transaction: existing, activation_status: "pending" }, 200, cors);
+        }
+
+        const results = await env.DB.batch([
+          env.DB.prepare(
+            "INSERT INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT ?, 'package_purchase', ?, 'success', ? WHERE EXISTS (SELECT 1 FROM wallets WHERE customer_id = ? AND balance_taka >= ?) AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)",
+          ).bind(customer.id, pkg.price_taka, reference, customer.id, pkg.price_taka, reference),
+          env.DB.prepare(
+            "UPDATE wallets SET balance_taka = balance_taka - ? WHERE customer_id = ? AND changes() = 1",
+          ).bind(pkg.price_taka, customer.id),
+          env.DB.prepare(
+            "INSERT INTO customer_packages (customer_id, package_id, service_type, price_taka, speed_mbps, status) SELECT ?, ?, ?, ?, ?, 'pending' WHERE changes() = 1",
+          ).bind(customer.id, pkg.id, pkg.service_type, pkg.price_taka, pkg.speed_mbps),
+        ]);
+        const ledgerInserted = Number(results?.[0]?.meta?.changes || 0);
+        if (ledgerInserted !== 1) {
+          const balance = await env.DB.prepare(
+            "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
+          ).bind(customer.id).first();
+          return fail(balance ? "insufficient_wallet_balance_or_duplicate_request" : "wallet_not_found", 409, cors);
+        }
+        const order = await env.DB.prepare(
+          "SELECT id, package_id, service_type, price_taka, speed_mbps, status, created_at FROM customer_packages WHERE customer_id = ? ORDER BY id DESC LIMIT 1",
+        ).bind(customer.id).first();
+        const wallet = await env.DB.prepare(
+          "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
+        ).bind(customer.id).first();
+        return json({
+          ok: true,
+          order,
+          balance_taka: Number(wallet?.balance_taka || 0),
+          activation_status: "pending",
+          message: "payment_deducted_package_waiting_for_router_activation",
+        }, 201, cors);
+      }
+
+      if (url.pathname === "/packages/mine" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 20);
+        const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 20;
+        const result = await env.DB.prepare(
+          "SELECT cp.id, cp.package_id, cp.service_type, cp.price_taka, cp.speed_mbps, cp.started_at, cp.expires_at, cp.status, cp.created_at, p.duration FROM customer_packages cp LEFT JOIN packages p ON p.id = cp.package_id WHERE cp.customer_id = ? ORDER BY cp.id DESC LIMIT ?",
+        ).bind(customer.id, limit).all();
         return json({ ok: true, packages: result.results || [] }, 200, cors);
       }
 
