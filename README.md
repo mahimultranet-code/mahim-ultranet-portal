@@ -11,6 +11,7 @@ The API-connected mobile-first portal is in `portal-app.html`. It includes:
 - Active Hotspot/PPPoE package catalogue and purchase requests
 - bKash/Nagad payment submission (pending until an administrator verifies it)
 - Customer complaints and replies
+- Customer password-reset requests and administrator-managed password replacement with session revocation
 - ৳20 emergency Internet request workflow, admin approval queue, and debt-first recharge settlement (requires D1 migration 0002)
 - Basic administrator dashboard and package creation
 - PWA manifest, app icon and an offline shell service worker
