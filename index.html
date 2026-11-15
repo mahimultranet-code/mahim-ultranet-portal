@@ -106,6 +106,5 @@ document.getElementById('rechargeForm').addEventListener('submit',e=>{
  const msg='Mahim UltraNet WiFi রিচার্জ আবেদন%0Aনাম: '+encodeURIComponent(data.name)+'%0Aমোবাইল: '+encodeURIComponent(data.phone)+'%0Aপ্যাকেজ: '+encodeURIComponent(data.package)+'%0Aপেমেন্ট: '+encodeURIComponent(data.payment)+'%0ATransaction ID: '+encodeURIComponent(data.transaction);
  document.getElementById('formStatus').innerHTML='আবেদনের তথ্য প্রস্তুত। WhatsApp-এ অ্যাডমিনকে পাঠাতে নিচের লিংকে চাপ দিন: <a target="_blank" rel="noopener" href="https://wa.me/8801723054631?text='+msg+'">WhatsApp-এ আবেদন পাঠান</a>। অ্যাডমিন যাচাই না করা পর্যন্ত রিচার্জ সম্পন্ন হবে না।';
 });
-['loginForm','signupForm'].forEach(id=>document.getElementById(id).addEventListener('submit',e=>{e.preventDefault();alert('এই সুবিধাটি নিরাপদ সার্ভার সংযোগের পর চালু হবে। এখনো লগইন বা অ্যাকাউন্ট তৈরি হচ্ছে না।');}));
 </script>
 </body></html>
