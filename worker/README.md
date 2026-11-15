@@ -16,6 +16,7 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Admin dashboard, customer directory/search, payment queue with approve/reject, complaint queue/replies, and package catalogue create/update/enable/disable.
 - Read-only admin package-order queue at GET /admin/package-orders?status=pending. Supported status filters: pending, active, expired, and rejected.
 - Emergency Internet request submission, admin approval/rejection, customer debt balance/history, and debt-first settlement from the next approved recharge. The 30-minute fee is ৳20; approval records the debt but does not activate RouterOS.
+- Customer password-reset requests with a generic response to avoid account enumeration; admin can set a new password, revoke all existing customer sessions, and create an audit entry.
 - Admin actions write audit-log entries where implemented.
 
 ## Database migrations
@@ -41,8 +42,9 @@ After deploying the feature-branch Worker source manually:
 3. Perform the one-time admin bootstrap securely, using the Worker secret without exposing it.
 4. Test admin login/session, customer registration/login, customer isolation, wallet reads, payment submission, approval/rejection, package purchase idempotency, complaints, package management, and package-order visibility.
 5. Test emergency eligibility (five approved recharges), duplicate pending-request prevention, admin approval/rejection, the ৳20 debt record, partial/full debt settlement from recharge, and repeated-approval protection.
-6. Test cookies in Android Chrome. GitHub Pages and workers.dev are cross-site; third-party cookie restrictions may prevent sessions. A same-site custom API domain may be needed.
-7. Only after all tests pass should real customer payments be accepted.
+6. Test password-reset request privacy, admin reset, password login with the new password, and revocation of previous sessions.
+7. Test cookies in Android Chrome. GitHub Pages and workers.dev are cross-site; third-party cookie restrictions may prevent sessions. A same-site custom API domain may be needed.
+8. Only after all tests pass should real customer payments be accepted.
 
 ## Safety gates
 
@@ -50,6 +52,7 @@ After deploying the feature-branch Worker source manually:
 - Package purchase debits the wallet and creates a pending order. It does not activate internet access.
 - The admin package-order endpoint is read-only. No manual action in the portal may mark an order active before RouterOS activation and verification exist.
 - Emergency request and debt-accounting code is present in this branch, but it is not live until migration 0002 is applied and the updated Worker is deployed. Admin approval records a ৳20 debt; no RouterOS session is activated. Test debt settlement before accepting real use.
+- Password reset is administrator-managed. The admin must communicate the new password to the customer through a separately verified secure channel; never send it in public chat or store it in an admin note.
 - MikroTik outbound polling/command execution is not implemented. Before implementation, require command authentication, strict allowlisting, expiry, replay protection, retries, and router-side verification.
 - Never expose RouterOS management ports or credentials to the public internet.
 
