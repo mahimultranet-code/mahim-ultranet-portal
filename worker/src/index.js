@@ -17,7 +17,7 @@ function corsHeaders(request) {
     "access-control-allow-origin": ALLOWED_ORIGIN,
     "access-control-allow-credentials": "true",
     "access-control-allow-methods": "GET, POST, OPTIONS",
-    "access-control-allow-headers": "Content-Type",
+    "access-control-allow-headers": "Content-Type, Idempotency-Key, X-Admin-Setup-Secret",
     "access-control-max-age": "600",
     "vary": "Origin",
   };
@@ -187,7 +187,7 @@ export default {
     }
 
     const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine"].includes(url.pathname) && !adminPaymentAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap"].includes(url.pathname) && !adminPaymentAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -195,6 +195,54 @@ export default {
     if (!["GET", "POST"].includes(request.method)) return fail("method_not_allowed", 405, cors);
 
     try {
+      if (url.pathname === "/admin/bootstrap" && request.method === "POST") {
+        if (typeof env.ADMIN_SETUP_SECRET !== "string" || env.ADMIN_SETUP_SECRET.length < 16) {
+          return fail("admin_setup_unavailable", 503, cors);
+        }
+        if (!(await rateLimit(env.DB, request, "admin-bootstrap"))) {
+          return fail("too_many_attempts", 429, cors);
+        }
+        const suppliedSecret = request.headers.get("X-Admin-Setup-Secret") || "";
+        const expectedHash = await sha256(env.ADMIN_SETUP_SECRET);
+        const suppliedHash = await sha256(suppliedSecret);
+        let secretMismatch = expectedHash.length ^ suppliedHash.length;
+        for (let i = 0; i < Math.min(expectedHash.length, suppliedHash.length); i++) {
+          secretMismatch |= expectedHash.charCodeAt(i) ^ suppliedHash.charCodeAt(i);
+        }
+        if (secretMismatch !== 0) return fail("invalid_setup_secret", 403, cors);
+
+        const body = await readJson(request);
+        const name = typeof body.name === "string" ? body.name.trim() : "";
+        const mobile = typeof body.mobile === "string" ? body.mobile.trim() : "";
+        const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const password = typeof body.password === "string" ? body.password : "";
+        if (name.length < 2 || name.length > 80) return fail("invalid_name", 400, cors);
+        if (!/^01[3-9]\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+          return fail("invalid_email", 400, cors);
+        }
+        if (password.length < 12 || password.length > 128) return fail("weak_password", 400, cors);
+        const passwordHash = await hashPassword(password);
+        const inserted = await env.DB.prepare(
+          "INSERT INTO customers (name, mobile, password_hash, role, email, is_verified) SELECT ?, ?, ?, 'admin', ?, 1 WHERE NOT EXISTS (SELECT 1 FROM customers WHERE role = 'admin')",
+        ).bind(name, mobile, passwordHash, email).run();
+        const adminId = Number(inserted.meta?.last_row_id || 0);
+        if (Number(inserted.meta?.changes || 0) !== 1 || !Number.isSafeInteger(adminId) || adminId < 1) {
+          return fail("admin_already_initialized_or_mobile_unavailable", 409, cors);
+        }
+        await env.DB.prepare(
+          "INSERT OR IGNORE INTO wallets (customer_id, balance_taka) VALUES (?, 0)",
+        ).bind(adminId).run();
+        const token = await createSession(env.DB, adminId);
+        const admin = await env.DB.prepare(
+          "SELECT id, name, mobile, email, role, is_verified, mikrotik_username FROM customers WHERE id = ?",
+        ).bind(adminId).first();
+        return json({ ok: true, customer: publicCustomer(admin) }, 201, {
+          ...cors,
+          "set-cookie": sessionCookie(token),
+        });
+      }
+
       if (url.pathname === "/auth/register" && request.method === "POST") {
         const body = await readJson(request);
         const name = typeof body.name === "string" ? body.name.trim() : "";
