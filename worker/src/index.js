@@ -190,8 +190,9 @@ export default {
     const adminComplaintReply = url.pathname.match(/^\/admin\/complaints\/(\d+)\/reply$/);
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
+    const adminEmergencyAction = url.pathname.match(/^\/admin\/emergency\/(\d+)\/(approve|reject)$/);
     const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -475,6 +476,40 @@ export default {
         return json({ ok: true, payments: result.results || [] }, 200, cors);
       }
 
+      if (url.pathname === "/emergency/request" && request.method === "POST") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        if (customer.role !== "customer") return fail("customer_account_required", 403, cors);
+        if (!(await rateLimit(env.DB, request, "emergency-request", String(customer.id)))) return fail("too_many_attempts", 429, cors);
+        const result = await env.DB.prepare(
+          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved') >= 5 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status = 'pending')",
+        ).bind(customer.id, customer.id, customer.id, customer.id).run();
+        if (Number(result.meta?.changes || 0) !== 1) return fail("not_eligible_or_existing_debt_or_pending_request", 409, cors);
+        return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
+      }
+
+      if (url.pathname === "/emergency/mine" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const [requests, debt] = await Promise.all([
+          env.DB.prepare("SELECT id, fee_taka, status, created_at FROM emergency_requests WHERE customer_id = ? ORDER BY id DESC LIMIT 20").bind(customer.id).all(),
+          env.DB.prepare("SELECT amount_due_taka FROM emergency_debts WHERE customer_id = ?").bind(customer.id).first(),
+        ]);
+        return json({ ok: true, requests: requests.results || [], amount_due_taka: Number(debt?.amount_due_taka || 0) }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/emergency" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const status = url.searchParams.get("status") || "pending";
+        if (!["pending", "approved", "rejected"].includes(status)) return fail("invalid_status", 400, cors);
+        const result = await env.DB.prepare(
+          "SELECT e.id, e.customer_id, c.name AS customer_name, c.mobile AS customer_mobile, e.fee_taka, e.status, e.created_at FROM emergency_requests e JOIN customers c ON c.id = e.customer_id WHERE e.status = ? ORDER BY e.id DESC LIMIT 100",
+        ).bind(status).all();
+        return json({ ok: true, requests: result.results || [] }, 200, cors);
+      }
+
       if (url.pathname === "/complaints" && request.method === "POST") {
         const customer = await getSessionCustomer(env.DB, request);
         if (!customer) return fail("unauthorized", 401, cors);
@@ -622,6 +657,36 @@ export default {
         return json({ ok: true, complaint_id: complaintId, status }, 200, cors);
       }
 
+      if (adminEmergencyAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const requestId = Number(adminEmergencyAction[1]);
+        const action = adminEmergencyAction[2];
+        if (!Number.isSafeInteger(requestId) || requestId < 1) return fail("invalid_emergency_request_id", 400, cors);
+        if (action === "approve") {
+          const results = await env.DB.batch([
+            env.DB.prepare(
+              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved') >= 5 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0)",
+            ).bind(requestId),
+            env.DB.prepare(
+              "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT customer_id, fee_taka FROM emergency_requests WHERE id = ? AND status = 'approved' ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
+            ).bind(requestId),
+            env.DB.prepare(
+              "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_request_approved', 'emergency_request_id=' || ? WHERE changes() = 1",
+            ).bind(admin.id, requestId),
+          ]);
+          if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_eligible_or_debt_exists", 409, cors);
+          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, activation_status: "pending_routeros_verification" }, 200, cors);
+        }
+        const results = await env.DB.batch([
+          env.DB.prepare("UPDATE emergency_requests SET status = 'rejected' WHERE id = ? AND status = 'pending'").bind(requestId),
+          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_request_rejected', 'emergency_request_id=' || ? WHERE changes() = 1").bind(admin.id, requestId),
+        ]);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_found", 409, cors);
+        return json({ ok: true, request_id: requestId, status: "rejected" }, 200, cors);
+      }
+
       if (url.pathname === "/admin/dashboard" && request.method === "GET") {
         const admin = await getSessionCustomer(env.DB, request);
         if (!admin) return fail("unauthorized", 401, cors);
@@ -694,10 +759,16 @@ export default {
               "INSERT OR IGNORE INTO wallets (customer_id, balance_taka) SELECT customer_id, 0 FROM payment_requests WHERE id = ? AND status = 'approved'",
             ).bind(paymentId),
             env.DB.prepare(
-              "INSERT OR IGNORE INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT customer_id, 'recharge', amount_taka, 'success', 'payment:' || id FROM payment_requests WHERE id = ? AND status = 'approved'",
+              "INSERT INTO emergency_debt_transactions (payment_id, customer_id, amount_taka) SELECT p.id, p.customer_id, MIN(d.amount_due_taka, p.amount_taka) FROM payment_requests p JOIN emergency_debts d ON d.customer_id = p.customer_id WHERE p.id = ? AND p.status = 'approved' AND d.amount_due_taka > 0 AND NOT EXISTS (SELECT 1 FROM emergency_debt_transactions WHERE payment_id = p.id)",
             ).bind(paymentId),
             env.DB.prepare(
-              "UPDATE wallets SET balance_taka = balance_taka + (SELECT amount_taka FROM payment_requests WHERE id = ?) WHERE customer_id = (SELECT customer_id FROM payment_requests WHERE id = ?) AND changes() = 1",
+              "UPDATE emergency_debts SET amount_due_taka = amount_due_taka - (SELECT amount_taka FROM emergency_debt_transactions WHERE payment_id = ?) , updated_at = CURRENT_TIMESTAMP WHERE customer_id = (SELECT customer_id FROM payment_requests WHERE id = ?) AND changes() = 1",
+            ).bind(paymentId, paymentId),
+            env.DB.prepare(
+              "INSERT OR IGNORE INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT p.customer_id, 'recharge', p.amount_taka - COALESCE((SELECT amount_taka FROM emergency_debt_transactions WHERE payment_id = p.id), 0), 'success', 'payment:' || p.id FROM payment_requests p WHERE p.id = ? AND p.status = 'approved' AND p.amount_taka > COALESCE((SELECT amount_taka FROM emergency_debt_transactions WHERE payment_id = p.id), 0)",
+            ).bind(paymentId),
+            env.DB.prepare(
+              "UPDATE wallets SET balance_taka = balance_taka + (SELECT p.amount_taka - COALESCE((SELECT amount_taka FROM emergency_debt_transactions WHERE payment_id = p.id), 0) FROM payment_requests p WHERE p.id = ?) WHERE customer_id = (SELECT customer_id FROM payment_requests WHERE id = ?) AND changes() = 1",
             ).bind(paymentId, paymentId),
             env.DB.prepare(
               "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'payment_approved', 'payment_id=' || ? WHERE changes() = 1",
