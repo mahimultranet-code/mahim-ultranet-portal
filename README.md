@@ -28,7 +28,7 @@ The portal is structured as a Progressive Web App. Once it is safely published o
 - The existing `main` branch has not been changed.
 - The Worker source has **not** been deployed to Cloudflare yet. The existing production Worker may still return `Hello World!`.
 - `worker/wrangler.toml` defines an isolated staging Worker named `mahim-ultranet-api-v2-staging`, with its D1 binding pointed at `mahim-ultranet-db-staging`. Cloudflare Builds must use repository root `worker/` and branch `feature/secure-portal-backend`.
-- The migration directory contains baseline schema `0001`, emergency debt migration `0002`, and package seed migration `0003`. Apply them in order to the staging D1 database only.
+- The migration directory contains baseline schema `0001`, emergency debt migration `0002`, package seed migration `0003`, and five-hour package price update `0004`. Apply them in order to the staging D1 database only.
 - Do not accept real payments or promise live Internet activation until the Worker, D1 schema, cookie/session behavior and RouterOS integration have been tested end-to-end.
 - The portal currently calls the production Worker URL `https://mahim-ultranet-api-v2.mahimultranet.workers.dev`; staging deployment does not switch the portal to staging automatically. Update the portal API URL only after staging health and auth tests pass.
 - The portal's cross-site Secure cookie must be tested in Android Chrome; browser third-party-cookie restrictions may require putting the API on a same-site custom domain before production.
@@ -44,5 +44,6 @@ The portal is structured as a Progressive Web App. Once it is safely published o
 - `worker/wrangler.toml` — isolated staging deployment configuration
 - `worker/migrations/0001_initial.sql` — baseline D1 schema
 - `worker/migrations/0002_emergency_debt.sql` — emergency debt accounting
-- `worker/migrations/0003_seed_packages.sql` — 40 Hotspot + 1 PPPoE starter packages
+- `worker/migrations/0003_seed_packages.sql` — 40 Hotspot + 1 PPPoE starter packages (5-hour Hotspot package ৳20)
+- `worker/migrations/0004_update_five_hour_package_price.sql` — upgrades an existing 5-hour Hotspot package from ৳6 to ৳20
 - `worker/README.md` — API deployment and test notes
