@@ -186,7 +186,7 @@ export default {
       }
     }
 
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout"].includes(url.pathname)) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages"].includes(url.pathname)) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -275,6 +275,34 @@ export default {
           await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(await sha256(token)).run();
         }
         return json({ ok: true }, 200, { ...cors, "set-cookie": clearSessionCookie() });
+      }
+
+      if (url.pathname === "/packages" && request.method === "GET") {
+        const result = await env.DB.prepare(
+          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE is_active = 1 ORDER BY price_taka ASC, id ASC",
+        ).all();
+        return json({ ok: true, packages: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/wallet" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const wallet = await env.DB.prepare(
+          "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
+        ).bind(customer.id).first();
+        if (!wallet) return fail("wallet_not_found", 404, cors);
+        return json({ ok: true, balance_taka: Number(wallet.balance_taka) }, 200, cors);
+      }
+
+      if (url.pathname === "/wallet/transactions" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 20);
+        const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 20;
+        const result = await env.DB.prepare(
+          "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
+        ).bind(customer.id, limit).all();
+        return json({ ok: true, transactions: result.results || [] }, 200, cors);
       }
     } catch (error) {
       if (error?.message === "payload_too_large") return fail("payload_too_large", 413, cors);
