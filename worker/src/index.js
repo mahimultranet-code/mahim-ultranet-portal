@@ -328,9 +328,10 @@ export default {
           ).bind(customer.id).first();
           return fail(balance ? "insufficient_wallet_balance_or_duplicate_request" : "wallet_not_found", 409, cors);
         }
-        const order = await env.DB.prepare(
-          "SELECT id, package_id, service_type, price_taka, speed_mbps, status, created_at FROM customer_packages WHERE customer_id = ? ORDER BY id DESC LIMIT 1",
-        ).bind(customer.id).first();
+        const orderId = Number(results?.[2]?.meta?.last_row_id || 0);
+        const order = orderId ? await env.DB.prepare(
+          "SELECT id, package_id, service_type, price_taka, speed_mbps, status, created_at FROM customer_packages WHERE id = ? AND customer_id = ? LIMIT 1",
+        ).bind(orderId, customer.id).first() : null;
         const wallet = await env.DB.prepare(
           "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
         ).bind(customer.id).first();
