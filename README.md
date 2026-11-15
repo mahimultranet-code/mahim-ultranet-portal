@@ -28,8 +28,8 @@ The portal is structured as a Progressive Web App. Once it is safely published o
 - The existing `main` branch has not been changed.
 - The Worker source has **not** been deployed to Cloudflare yet. The existing production Worker may still return `Hello World!`.
 - `worker/wrangler.toml` now defines an isolated staging Worker named `mahim-ultranet-api-v2-staging`; configure Cloudflare Builds with repository root `worker/` and branch `feature/secure-portal-backend` only after creating that separate Worker.
-- Staging deployment is intentionally blocked until a separate D1 database named `mahim-ultranet-db-staging` is created and its ID replaces the placeholder in `worker/wrangler.toml`. Do not use the production D1 database ID here.
-- The migration directory currently has migrations `0002` and `0003` but no baseline `0001`; prepare and verify a complete staging schema before applying migrations or deploying.
+- The staging D1 binding is configured to `mahim-ultranet-db-staging` using the ID currently recorded in `worker/wrangler.toml`. Verify the database name and ID in Cloudflare before deployment; never substitute the production database ID.
+- The migration directory now contains baseline schema `0001`, emergency debt migration `0002`, and package seed migration `0003`. Apply them in order to the staging D1 database only.
 - Do not accept real payments or promise live Internet activation until the Worker, D1 schema, cookie/session behavior and RouterOS integration have been tested end-to-end.
 - The portal currently calls the Worker at `https://mahim-ultranet-api-v2.mahimultranet.workers.dev`. Its cross-site Secure cookie must be tested in Android Chrome; browser third-party-cookie restrictions may require putting the API on a same-site custom domain before production.
 - Package orders remain pending until a verified RouterOS activation bridge is implemented.
@@ -41,7 +41,7 @@ The portal is structured as a Progressive Web App. Once it is safely published o
 - `sw.js` — static app-shell caching
 - `icon.svg` — application icon
 - `worker/src/index.js` — Cloudflare Worker API
-- `worker/wrangler.toml` — isolated staging deployment configuration (D1 ID placeholder must be replaced)
+- `worker/wrangler.toml` — isolated staging deployment configuration
 - `worker/migrations/0002_emergency_debt.sql` — emergency debt accounting
 - `worker/migrations/0003_seed_packages.sql` — 40 Hotspot + 1 PPPoE starter packages
 - `worker/README.md` — API deployment and test notes
