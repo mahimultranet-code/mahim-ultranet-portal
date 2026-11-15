@@ -1,5 +1,5 @@
 -- Mahim UltraNet emergency internet debt accounting
--- Apply this migration to the existing mahim-ultranet-db before deploying the updated Worker.
+-- Apply this migration only to the isolated staging D1 database after 0001_initial.sql.
 -- An emergency request is charged only after an administrator approves it.
 -- A customer may have one outstanding debt balance; the next approved recharge pays it first.
 
