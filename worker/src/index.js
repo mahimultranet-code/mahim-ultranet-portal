@@ -186,7 +186,7 @@ export default {
       }
     }
 
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages"].includes(url.pathname)) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine"].includes(url.pathname)) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -303,6 +303,53 @@ export default {
           "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, transactions: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/payments/request" && request.method === "POST") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const body = await readJson(request);
+        const method = typeof body.method === "string" ? body.method.trim().toLowerCase() : "";
+        const senderMobile = typeof body.sender_mobile === "string" ? body.sender_mobile.trim() : "";
+        const transactionId = typeof body.transaction_id === "string" ? body.transaction_id.trim().toUpperCase() : "";
+        const amount = Number(body.amount_taka);
+        if (!["bkash", "nagad"].includes(method)) return fail("invalid_payment_method", 400, cors);
+        if (!/^01[3-9]\d{8}$/.test(senderMobile)) return fail("invalid_sender_mobile", 400, cors);
+        if (!/^[A-Z0-9-]{6,32}$/.test(transactionId)) return fail("invalid_transaction_id", 400, cors);
+        if (!Number.isSafeInteger(amount) || amount < 1 || amount > 50000) return fail("invalid_amount", 400, cors);
+        if (!(await rateLimit(env.DB, request, "payment-request", String(customer.id)))) {
+          return fail("too_many_attempts", 429, cors);
+        }
+        try {
+          const inserted = await env.DB.prepare(
+            "INSERT INTO payment_requests (customer_id, method, sender_mobile, transaction_id, amount_taka, status) VALUES (?, ?, ?, ?, ?, 'pending')",
+          ).bind(customer.id, method, senderMobile, transactionId, amount).run();
+          return json({
+            ok: true,
+            payment: {
+              id: Number(inserted.meta?.last_row_id),
+              method,
+              sender_mobile: senderMobile,
+              transaction_id: transactionId,
+              amount_taka: amount,
+              status: "pending",
+            },
+            message: "payment_submitted_for_manual_review",
+          }, 201, cors);
+        } catch {
+          return fail("transaction_id_already_used_or_request_invalid", 409, cors);
+        }
+      }
+
+      if (url.pathname === "/payments/mine" && request.method === "GET") {
+        const customer = await getSessionCustomer(env.DB, request);
+        if (!customer) return fail("unauthorized", 401, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 20);
+        const limit = Number.isInteger(rawLimit) ? Math.min(50, Math.max(1, rawLimit)) : 20;
+        const result = await env.DB.prepare(
+          "SELECT id, method, sender_mobile, transaction_id, amount_taka, status, created_at FROM payment_requests WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
+        ).bind(customer.id, limit).all();
+        return json({ ok: true, payments: result.results || [] }, 200, cors);
       }
     } catch (error) {
       if (error?.message === "payload_too_large") return fail("payload_too_large", 413, cors);
