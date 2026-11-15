@@ -15,7 +15,12 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - One-time admin bootstrap protected by the existing ADMIN_SETUP_SECRET Worker secret.
 - Admin dashboard, customer directory/search, payment queue with approve/reject, complaint queue/replies, and package catalogue create/update/enable/disable.
 - Read-only admin package-order queue at GET /admin/package-orders?status=pending. Supported status filters: pending, active, expired, and rejected.
+- Emergency Internet request submission, admin approval/rejection, customer debt balance/history, and debt-first settlement from the next approved recharge. The 30-minute fee is ৳20; approval records the debt but does not activate RouterOS.
 - Admin actions write audit-log entries where implemented.
+
+## Database migrations
+
+Before deploying the updated Worker, apply `worker/migrations/0002_emergency_debt.sql` to the existing D1 database. It creates the emergency debt balance and repayment ledger tables plus lookup indexes. Keep a D1 backup before applying migrations.
 
 ## Deploy prerequisites
 
@@ -35,15 +40,16 @@ After deploying the feature-branch Worker source manually:
 2. Confirm the database schema and required unique wallet transaction reference index.
 3. Perform the one-time admin bootstrap securely, using the Worker secret without exposing it.
 4. Test admin login/session, customer registration/login, customer isolation, wallet reads, payment submission, approval/rejection, package purchase idempotency, complaints, package management, and package-order visibility.
-5. Test cookies in Android Chrome. GitHub Pages and workers.dev are cross-site; third-party cookie restrictions may prevent sessions. A same-site custom API domain may be needed.
-6. Only after all tests pass should real customer payments be accepted.
+5. Test emergency eligibility (five approved recharges), duplicate pending-request prevention, admin approval/rejection, the ৳20 debt record, partial/full debt settlement from recharge, and repeated-approval protection.
+6. Test cookies in Android Chrome. GitHub Pages and workers.dev are cross-site; third-party cookie restrictions may prevent sessions. A same-site custom API domain may be needed.
+7. Only after all tests pass should real customer payments be accepted.
 
 ## Safety gates
 
 - Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with a unique ledger reference and guarded balance update.
 - Package purchase debits the wallet and creates a pending order. It does not activate internet access.
 - The admin package-order endpoint is read-only. No manual action in the portal may mark an order active before RouterOS activation and verification exist.
-- Emergency Internet/debt accounting is not implemented. The approved product fee is ৳20 for a 30-minute emergency session; do not activate or collect this fee until the debt ledger, eligibility checks (5 successful recharges), and next-recharge debt deduction are implemented and tested.
+- Emergency request and debt-accounting code is present in this branch, but it is not live until migration 0002 is applied and the updated Worker is deployed. Admin approval records a ৳20 debt; no RouterOS session is activated. Test debt settlement before accepting real use.
 - MikroTik outbound polling/command execution is not implemented. Before implementation, require command authentication, strict allowlisting, expiry, replay protection, retries, and router-side verification.
 - Never expose RouterOS management ports or credentials to the public internet.
 
