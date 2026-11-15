@@ -186,8 +186,8 @@ export default {
       }
     }
 
-    const adminPaymentAction = url.pathname.match(/^\\/admin\\/payments\\/(\\d+)\\/(approve|reject)$/);
-    const adminComplaintReply = url.pathname.match(/^\\/admin\\/complaints\\/(\\d+)\\/reply$/);
+    const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
+    const adminComplaintReply = url.pathname.match(/^\/admin\/complaints\/(\d+)\/reply$/);
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed) {
       return fail("not_found", 404, cors);
