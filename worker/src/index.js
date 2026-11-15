@@ -1,4 +1,4 @@
-const SERVICE = "mahim-ultranet-api-v2";
+const SERVICE = "mahim-ultranet-api-v2-staging";
 const ALLOWED_ORIGIN = "https://mahimultranet-code.github.io";
 const SESSION_COOKIE = "__Host-ultranet_session";
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
