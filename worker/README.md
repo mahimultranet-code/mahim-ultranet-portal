@@ -43,7 +43,7 @@ After deploying the feature-branch Worker source manually:
 - Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with a unique ledger reference and guarded balance update.
 - Package purchase debits the wallet and creates a pending order. It does not activate internet access.
 - The admin package-order endpoint is read-only. No manual action in the portal may mark an order active before RouterOS activation and verification exist.
-- Emergency Internet/debt accounting is not implemented.
+- Emergency Internet/debt accounting is not implemented. The approved product fee is ৳20 for a 30-minute emergency session; do not activate or collect this fee until the debt ledger, eligibility checks (5 successful recharges), and next-recharge debt deduction are implemented and tested.
 - MikroTik outbound polling/command execution is not implemented. Before implementation, require command authentication, strict allowlisting, expiry, replay protection, retries, and router-side verification.
 - Never expose RouterOS management ports or credentials to the public internet.
 
