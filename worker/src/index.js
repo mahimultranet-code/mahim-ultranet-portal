@@ -186,7 +186,8 @@ export default {
       }
     }
 
-    const adminPaymentAction = url.pathname.match(/^\\/admin\\/payments\\/(\\d+)\\/(approve|reject)$/);\n    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments"].includes(url.pathname) && !adminPaymentAction) {
+    const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments"].includes(url.pathname) && !adminPaymentAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
