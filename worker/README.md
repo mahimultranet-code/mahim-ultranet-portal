@@ -21,7 +21,12 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 
 ## Database migrations
 
-Before deploying the updated Worker, apply `worker/migrations/0002_emergency_debt.sql` to the existing D1 database. It creates the emergency debt balance and repayment ledger tables plus lookup indexes. Keep a D1 backup before applying migrations.
+Before deploying the updated Worker, apply these SQL files to the existing D1 database in order:
+
+1. `worker/migrations/0002_emergency_debt.sql` — creates the emergency debt balance and repayment ledger tables plus lookup indexes, and updates legacy pending emergency requests to ৳20.
+2. `worker/migrations/0003_seed_packages.sql` — idempotently adds the 40 Hotspot packages and the ৳400 / 30-day / 10 Mbps PPPoE package when matching entries are missing.
+
+Keep a D1 backup before applying migrations.
 
 ## Deploy prerequisites
 
@@ -51,7 +56,7 @@ After deploying the feature-branch Worker source manually:
 - Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with a unique ledger reference and guarded balance update.
 - Package purchase debits the wallet and creates a pending order. It does not activate internet access.
 - The admin package-order endpoint is read-only. No manual action in the portal may mark an order active before RouterOS activation and verification exist.
-- Emergency request and debt-accounting code is present in this branch, but it is not live until migration 0002 is applied and the updated Worker is deployed. Admin approval records a ৳20 debt; no RouterOS session is activated. Test debt settlement before accepting real use.
+- Emergency request and debt-accounting code is present in this branch, but it is not live until migrations 0002 and 0003 are applied and the updated Worker is deployed. Admin approval records a ৳20 debt; no RouterOS session is activated. Test debt settlement before accepting real use.
 - Password reset is administrator-managed. The admin must communicate the new password to the customer through a separately verified secure channel; never send it in public chat or store it in an admin note.
 - MikroTik outbound polling/command execution is not implemented. Before implementation, require command authentication, strict allowlisting, expiry, replay protection, retries, and router-side verification.
 - Never expose RouterOS management ports or credentials to the public internet.
