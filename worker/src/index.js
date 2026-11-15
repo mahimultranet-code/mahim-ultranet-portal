@@ -186,7 +186,7 @@ export default {
       }
     }
 
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine"].includes(url.pathname)) {
+    const adminPaymentAction = url.pathname.match(/^\\/admin\\/payments\\/(\\d+)\\/(approve|reject)$/);\n    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments"].includes(url.pathname) && !adminPaymentAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -350,6 +350,67 @@ export default {
           "SELECT id, method, sender_mobile, transaction_id, amount_taka, status, created_at FROM payment_requests WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, payments: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/payments" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const status = url.searchParams.get("status") || "pending";
+        if (!["pending", "approved", "rejected"].includes(status)) return fail("invalid_status", 400, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 50);
+        const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+        const result = await env.DB.prepare(
+          "SELECT p.id, p.customer_id, c.name AS customer_name, c.mobile AS customer_mobile, p.method, p.sender_mobile, p.transaction_id, p.amount_taka, p.status, p.created_at FROM payment_requests p JOIN customers c ON c.id = p.customer_id WHERE p.status = ? ORDER BY p.id DESC LIMIT ?",
+        ).bind(status, limit).all();
+        return json({ ok: true, payments: result.results || [] }, 200, cors);
+      }
+
+      if (adminPaymentAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const paymentId = Number(adminPaymentAction[1]);
+        const action = adminPaymentAction[2];
+        if (!Number.isSafeInteger(paymentId) || paymentId < 1) return fail("invalid_payment_id", 400, cors);
+        if (!(await rateLimit(env.DB, request, "admin-payment-action", String(admin.id)))) {
+          return fail("too_many_attempts", 429, cors);
+        }
+
+        if (action === "approve") {
+          const results = await env.DB.batch([
+            env.DB.prepare(
+              "UPDATE payment_requests SET status = 'approved' WHERE id = ? AND status = 'pending'",
+            ).bind(paymentId),
+            env.DB.prepare(
+              "INSERT OR IGNORE INTO wallets (customer_id, balance_taka) SELECT customer_id, 0 FROM payment_requests WHERE id = ? AND status = 'approved'",
+            ).bind(paymentId),
+            env.DB.prepare(
+              "INSERT OR IGNORE INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT customer_id, 'recharge', amount_taka, 'success', 'payment:' || id FROM payment_requests WHERE id = ? AND status = 'approved'",
+            ).bind(paymentId),
+            env.DB.prepare(
+              "UPDATE wallets SET balance_taka = balance_taka + (SELECT amount_taka FROM payment_requests WHERE id = ?) WHERE customer_id = (SELECT customer_id FROM payment_requests WHERE id = ?) AND changes() = 1",
+            ).bind(paymentId, paymentId),
+            env.DB.prepare(
+              "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'payment_approved', 'payment_id=' || ? WHERE changes() = 1",
+            ).bind(admin.id, paymentId),
+          ]);
+          const changed = Number(results?.[0]?.meta?.changes || 0);
+          if (changed !== 1) return fail("payment_not_pending_or_not_found", 409, cors);
+          return json({ ok: true, payment_id: paymentId, status: "approved" }, 200, cors);
+        }
+
+        const results = await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE payment_requests SET status = 'rejected' WHERE id = ? AND status = 'pending'",
+          ).bind(paymentId),
+          env.DB.prepare(
+            "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'payment_rejected', 'payment_id=' || ? WHERE changes() = 1",
+          ).bind(admin.id, paymentId),
+        ]);
+        const changed = Number(results?.[0]?.meta?.changes || 0);
+        if (changed !== 1) return fail("payment_not_pending_or_not_found", 409, cors);
+        return json({ ok: true, payment_id: paymentId, status: "rejected" }, 200, cors);
       }
     } catch (error) {
       if (error?.message === "payload_too_large") return fail("payload_too_large", 413, cors);
