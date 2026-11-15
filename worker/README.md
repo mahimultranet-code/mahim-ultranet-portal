@@ -28,6 +28,7 @@ A healthy response includes `ok: true` and a successful D1 connectivity check. U
 2. Deploy and test the one-time admin bootstrap using the existing Worker secret, then authentication, wallet reads, customer-isolated histories, package catalogue/purchase, pending payment submissions, and admin approval/rejection. Verify D1 batch semantics, idempotency, and duplicate-credit/debit behavior before accepting real payments.
 3. Implement payment requests and admin approval with atomic wallet ledger updates.
 4. Implement package purchase with server-side price lookup and idempotency.
-5. Build the admin UI for package creation, editing, and enable/disable controls using the new admin package endpoints.\n6. Implement the MikroTik outbound polling bridge only after command authentication, allowlisting, expiry, retry handling, and router-side verification are complete.
+5. Build the admin UI for package creation, editing, and enable/disable controls using the new admin package endpoints.
+6. Implement the MikroTik outbound polling bridge only after command authentication, allowlisting, expiry, retry handling, and router-side verification are complete.
 
 Authentication source is committed to the feature branch only and has not been deployed. No package or emergency session may be marked active until RouterOS execution and reporting have been tested end-to-end.
