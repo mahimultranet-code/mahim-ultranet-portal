@@ -189,7 +189,9 @@ export default {
     const adminPaymentAction = url.pathname.match(/^\/admin\/payments\/(\d+)\/(approve|reject)$/);
     const adminComplaintReply = url.pathname.match(/^\/admin\/complaints\/(\d+)\/reply$/);
     const adminComplaintAllowed = Boolean(adminComplaintReply);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed) {
+    const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
+    const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -499,6 +501,74 @@ export default {
           "SELECT id, subject, message, status, admin_reply, created_at FROM complaints WHERE customer_id = ? ORDER BY id DESC LIMIT ?",
         ).bind(customer.id, limit).all();
         return json({ ok: true, complaints: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/packages" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const result = await env.DB.prepare(
+          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type, is_active FROM packages ORDER BY service_type ASC, price_taka ASC, id ASC",
+        ).all();
+        return json({ ok: true, packages: result.results || [] }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/packages" && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const body = await readJson(request);
+        const price = Number(body.price_taka);
+        const durationMinutes = Number(body.duration_minutes);
+        const speed = Number(body.speed_mbps);
+        const duration = typeof body.duration === "string" ? body.duration.trim() : "";
+        const serviceType = typeof body.service_type === "string" ? body.service_type : "";
+        if (!Number.isSafeInteger(price) || price < 1 || price > 100000) return fail("invalid_price", 400, cors);
+        if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 525600) return fail("invalid_duration", 400, cors);
+        if (!Number.isSafeInteger(speed) || speed < 1 || speed > 1000) return fail("invalid_speed", 400, cors);
+        if (!duration || duration.length > 40) return fail("invalid_duration_label", 400, cors);
+        if (!["hotspot", "pppoe"].includes(serviceType)) return fail("invalid_service_type", 400, cors);
+        const active = body.is_active === false || body.is_active === 0 ? 0 : 1;
+        const result = await env.DB.batch([
+          env.DB.prepare(
+            "INSERT INTO packages (price_taka, duration, duration_minutes, speed_mbps, service_type, is_active) VALUES (?, ?, ?, ?, ?, ?)",
+          ).bind(price, duration, durationMinutes, speed, serviceType, active),
+          env.DB.prepare(
+            "INSERT INTO admin_logs (admin_id, action, details) VALUES (?, 'package_created', ?)",
+          ).bind(admin.id, JSON.stringify({ price_taka: price, duration, duration_minutes: durationMinutes, speed_mbps: speed, service_type: serviceType, is_active: active })),
+        ]);
+        const packageId = Number(result?.[0]?.meta?.last_row_id || 0);
+        return json({ ok: true, package_id: packageId }, 201, cors);
+      }
+
+      if (adminPackageAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const packageId = Number(adminPackageAction[1]);
+        if (!Number.isSafeInteger(packageId) || packageId < 1) return fail("invalid_package_id", 400, cors);
+        const body = await readJson(request);
+        const price = Number(body.price_taka);
+        const durationMinutes = Number(body.duration_minutes);
+        const speed = Number(body.speed_mbps);
+        const duration = typeof body.duration === "string" ? body.duration.trim() : "";
+        const serviceType = typeof body.service_type === "string" ? body.service_type : "";
+        if (!Number.isSafeInteger(price) || price < 1 || price > 100000) return fail("invalid_price", 400, cors);
+        if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 525600) return fail("invalid_duration", 400, cors);
+        if (!Number.isSafeInteger(speed) || speed < 1 || speed > 1000) return fail("invalid_speed", 400, cors);
+        if (!duration || duration.length > 40) return fail("invalid_duration_label", 400, cors);
+        if (!["hotspot", "pppoe"].includes(serviceType)) return fail("invalid_service_type", 400, cors);
+        const active = body.is_active === false || body.is_active === 0 ? 0 : 1;
+        const result = await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE packages SET price_taka = ?, duration = ?, duration_minutes = ?, speed_mbps = ?, service_type = ?, is_active = ? WHERE id = ?",
+          ).bind(price, duration, durationMinutes, speed, serviceType, active, packageId),
+          env.DB.prepare(
+            "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'package_updated', 'package_id=' || ? WHERE changes() = 1",
+          ).bind(admin.id, packageId),
+        ]);
+        if (Number(result?.[0]?.meta?.changes || 0) !== 1) return fail("package_not_found", 404, cors);
+        return json({ ok: true, package_id: packageId, is_active: active }, 200, cors);
       }
 
       if (url.pathname === "/admin/complaints" && request.method === "GET") {
