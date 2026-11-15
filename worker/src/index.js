@@ -191,8 +191,9 @@ export default {
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
     const adminEmergencyAction = url.pathname.match(/^\/admin\/emergency\/(\d+)\/(approve|reject)$/);
+    const adminPasswordResetAction = url.pathname.match(/^\/admin\/password-resets\/(\d+)\/complete$/);
     const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency", "/password-reset/request", "/admin/password-resets"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction && !adminPasswordResetAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -246,6 +247,17 @@ export default {
           ...cors,
           "set-cookie": sessionCookie(token),
         });
+      }
+
+      if (url.pathname === "/password-reset/request" && request.method === "POST") {
+        const body = await readJson(request);
+        const mobile = typeof body.mobile === "string" ? body.mobile.trim() : "";
+        if (!/^01[3-9]\\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
+        if (!(await rateLimit(env.DB, request, "password-reset-request", mobile))) return fail("too_many_attempts", 429, cors);
+        await env.DB.prepare(
+          "INSERT INTO password_reset_requests (customer_id, status) SELECT id, 'pending' FROM customers WHERE mobile = ? AND role = 'customer' AND NOT EXISTS (SELECT 1 FROM password_reset_requests WHERE customer_id = customers.id AND status = 'pending')",
+        ).bind(mobile).run();
+        return json({ ok: true, message: "if_account_exists_reset_request_submitted" }, 202, cors);
       }
 
       if (url.pathname === "/auth/register" && request.method === "POST") {
@@ -685,6 +697,38 @@ export default {
         ]);
         if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_found", 409, cors);
         return json({ ok: true, request_id: requestId, status: "rejected" }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/password-resets" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const status = url.searchParams.get("status") || "pending";
+        if (!["pending", "resolved"].includes(status)) return fail("invalid_status", 400, cors);
+        const result = await env.DB.prepare(
+          "SELECT r.id, r.customer_id, c.name AS customer_name, c.mobile AS customer_mobile, r.status, r.admin_note, r.created_at FROM password_reset_requests r JOIN customers c ON c.id = r.customer_id WHERE r.status = ? ORDER BY r.id DESC LIMIT 100",
+        ).bind(status).all();
+        return json({ ok: true, requests: result.results || [] }, 200, cors);
+      }
+
+      if (adminPasswordResetAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const resetId = Number(adminPasswordResetAction[1]);
+        if (!Number.isSafeInteger(resetId) || resetId < 1) return fail("invalid_reset_id", 400, cors);
+        const body = await readJson(request);
+        const password = typeof body.new_password === "string" ? body.new_password : "";
+        if (password.length < 10 || password.length > 128) return fail("weak_password", 400, cors);
+        const passwordHash = await hashPassword(password);
+        const results = await env.DB.batch([
+          env.DB.prepare("UPDATE customers SET password_hash = ? WHERE id = (SELECT customer_id FROM password_reset_requests WHERE id = ? AND status = 'pending')").bind(passwordHash, resetId),
+          env.DB.prepare("UPDATE password_reset_requests SET status = 'resolved', admin_note = 'Password reset completed; administrator must share the new password securely' WHERE id = ? AND status = 'pending' AND changes() = 1").bind(resetId),
+          env.DB.prepare("DELETE FROM sessions WHERE customer_id = (SELECT customer_id FROM password_reset_requests WHERE id = ? AND status = 'resolved') AND changes() = 1").bind(resetId),
+          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'password_reset_completed', 'reset_request_id=' || ? WHERE EXISTS (SELECT 1 FROM password_reset_requests WHERE id = ? AND status = 'resolved')").bind(admin.id, resetId, resetId),
+        ]);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1 || Number(results?.[1]?.meta?.changes || 0) !== 1) return fail("reset_request_not_pending_or_not_found", 409, cors);
+        return json({ ok: true, reset_request_id: resetId, status: "resolved", sessions_revoked: true, message: "share_the_new_password_with_customer_securely" }, 200, cors);
       }
 
       if (url.pathname === "/admin/dashboard" && request.method === "GET") {
