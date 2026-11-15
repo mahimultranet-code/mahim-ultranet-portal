@@ -38,4 +38,6 @@ The portal is structured as a Progressive Web App. Once it is safely published o
 - `sw.js` — static app-shell caching
 - `icon.svg` — application icon
 - `worker/src/index.js` — Cloudflare Worker API
+- `worker/migrations/0002_emergency_debt.sql` — emergency debt accounting
+- `worker/migrations/0003_seed_packages.sql` — 40 Hotspot + 1 PPPoE starter packages
 - `worker/README.md` — API deployment and test notes
