@@ -452,7 +452,7 @@ export default {
         if (!["bkash", "nagad"].includes(method)) return fail("invalid_payment_method", 400, cors);
         if (!/^01[3-9]\d{8}$/.test(senderMobile)) return fail("invalid_sender_mobile", 400, cors);
         if (!/^[A-Z0-9-]{6,32}$/.test(transactionId)) return fail("invalid_transaction_id", 400, cors);
-        if (!Number.isSafeInteger(amount) || amount < 1 || amount > 50000) return fail("invalid_amount", 400, cors);
+        if (!Number.isSafeInteger(amount) || amount < 10 || amount > 50000) return fail("minimum_recharge_is_10_taka", 400, cors);
         if (!(await rateLimit(env.DB, request, "payment-request", String(customer.id)))) {
           return fail("too_many_attempts", 429, cors);
         }
@@ -494,10 +494,10 @@ export default {
         if (customer.role !== "customer") return fail("customer_account_required", 403, cors);
         if (!(await rateLimit(env.DB, request, "emergency-request", String(customer.id)))) return fail("too_many_attempts", 429, cors);
         const result = await env.DB.prepare(
-          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved') >= 5 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status = 'pending')",
-        ).bind(customer.id, customer.id, customer.id, customer.id).run();
+          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status = 'pending')",
+        ).bind(customer.id, customer.id, customer.id, customer.id, customer.id).run();
         if (Number(result.meta?.changes || 0) !== 1) return fail("not_eligible_or_existing_debt_or_pending_request", 409, cors);
-        return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
+        return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, duration_minutes: 300, duration_hours: 5, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
       }
 
       if (url.pathname === "/emergency/mine" && request.method === "GET") {
@@ -679,7 +679,7 @@ export default {
         if (action === "approve") {
           const results = await env.DB.batch([
             env.DB.prepare(
-              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved') >= 5 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0)",
+              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0)",
             ).bind(requestId),
             env.DB.prepare(
               "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT customer_id, fee_taka FROM emergency_requests WHERE id = ? AND status = 'approved' ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
