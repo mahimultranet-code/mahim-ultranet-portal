@@ -42,7 +42,7 @@
 </section></div>
 <nav id="nav" class="nav hidden"><button class="active" data-page="home"><i>⌂</i>হোম</button><button data-page="packages"><i>▦</i>প্যাকেজ</button><button data-page="recharge"><i>＋</i>রিচার্জ</button><button data-page="history"><i>⇄</i>ইতিহাস</button></nav><div id="toast" class="toast" role="status"></div>
 <script>
-const API="https://mahim-ultranet-api-v2.mahimultranet.workers.dev";
+const API="https://mahim-ultranet-api-v2-staging.mahimultranet.workers.dev";
 let me=null,allPackages=[],serviceFilter="hotspot",currentPage="home";
 const $=id=>document.getElementById(id),money=n=>"৳"+Number(n||0).toLocaleString("bn-BD");
 function toast(s){const t=$("toast");t.textContent=s;t.style.display="block";clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.style.display="none",3200)}
