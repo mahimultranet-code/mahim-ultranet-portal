@@ -191,7 +191,7 @@ export default {
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
     const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -569,6 +569,20 @@ export default {
         ]);
         if (Number(result?.[0]?.meta?.changes || 0) !== 1) return fail("package_not_found", 404, cors);
         return json({ ok: true, package_id: packageId, is_active: active }, 200, cors);
+      }
+
+      if (url.pathname === "/admin/package-orders" && request.method === "GET") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const status = url.searchParams.get("status") || "pending";
+        if (!["pending", "active", "rejected", "expired"].includes(status)) return fail("invalid_status", 400, cors);
+        const rawLimit = Number(url.searchParams.get("limit") || 50);
+        const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 50;
+        const result = await env.DB.prepare(
+          "SELECT cp.id, cp.customer_id, c.name AS customer_name, c.mobile AS customer_mobile, cp.package_id, p.duration, cp.service_type, cp.price_taka, cp.speed_mbps, cp.status, cp.created_at FROM customer_packages cp JOIN customers c ON c.id = cp.customer_id LEFT JOIN packages p ON p.id = cp.package_id WHERE cp.status = ? ORDER BY cp.id DESC LIMIT ?",
+        ).bind(status, limit).all();
+        return json({ ok: true, orders: result.results || [] }, 200, cors);
       }
 
       if (url.pathname === "/admin/complaints" && request.method === "GET") {
