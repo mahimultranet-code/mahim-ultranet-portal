@@ -55,18 +55,8 @@ a{color:#75e9f4}.contactline{margin:6px 0;overflow-wrap:anywhere}.warning{backgr
  <div class="package"><h3>bKash</h3><div class="price" style="font-size:20px">01723054631</div><div class="duration">Personal Send Money</div></div>
  <div class="package"><h3>Nagad</h3><div class="price" style="font-size:20px">01324078406</div><div class="duration">Personal Send Money</div></div>
 </div>
-<form id="rechargeForm">
- <div class="formgrid">
-  <div><label for="customer">গ্রাহকের নাম</label><input id="customer" required placeholder="আপনার নাম"></div>
-  <div><label for="phone">মোবাইল নম্বর</label><input id="phone" required inputmode="tel" placeholder="01XXXXXXXXX"></div>
-  <div><label for="package">প্যাকেজ</label><select id="package" required><option value="">প্যাকেজ নির্বাচন করুন</option></select></div>
-  <div><label for="method">পেমেন্ট মাধ্যম</label><select id="method" required><option value="">নির্বাচন করুন</option><option>bKash</option><option>Nagad</option></select></div>
-  <div><label for="trx">Transaction ID</label><input id="trx" required placeholder="ট্রানজেকশন আইডি"></div>
- </div>
-<button type="submit" style="margin-top:14px">রিচার্জ আবেদন প্রস্তুত করুন</button>
-<p class="note">এটি এখনো সার্ভারে আবেদন পাঠায় না; আপনার দেওয়া তথ্য কপি করে অ্যাডমিনকে পাঠানোর প্রস্তুতি দেখাবে।</p>
-</form>
-<div id="formStatus" class="note" aria-live="polite"></div>
+<p class="note">রিচার্জের আবেদন, Transaction ID জমা ও অনুমোদনের অবস্থা দেখতে নিরাপদ গ্রাহক পোর্টাল ব্যবহার করুন।</p>
+<a class="btn" href="./portal-app.html">রিচার্জ / ওয়ালেট পোর্টাল খুলুন</a>
 </section>
 
 <section>
@@ -91,20 +81,14 @@ a{color:#75e9f4}.contactline{margin:6px 0;overflow-wrap:anywhere}.warning{backgr
 const packages=[
 [2,"৩০ মিনিট"],[4,"২ ঘণ্টা"],[6,"৫ ঘণ্টা"],[8,"৯ ঘণ্টা"],[10,"১২ ঘণ্টা"],[12,"১৪ ঘণ্টা"],[14,"১৬ ঘণ্টা"],[16,"১ দিন"],[18,"২ দিন"],[26,"৩ দিন"],[34,"৪ দিন"],[44,"৫ দিন"],[52,"৬ দিন"],[60,"৭ দিন"],[70,"৮ দিন"],[78,"৯ দিন"],[86,"১০ দিন"],[96,"১১ দিন"],[114,"১২ দিন"],[116,"১৩ দিন"],[118,"১৪ দিন"],[120,"১৫ দিন"],[122,"১৬ দিন"],[124,"১৭ দিন"],[126,"১৮ দিন"],[128,"১৯ দিন"],[130,"২০ দিন"],[132,"২১ দিন"],[134,"২২ দিন"],[136,"২৩ দিন"],[138,"২৪ দিন"],[140,"২৫ দিন"],[142,"২৬ দিন"],[144,"২৭ দিন"],[146,"২৮ দিন"],[148,"২৯ দিন"],[150,"১ মাস"],[280,"২ মাস"],[360,"৩ মাস"],[400,"৪ মাস"]
 ];
-const grid=document.getElementById('packages'), select=document.getElementById('package');
+const grid=document.getElementById('packages');
 packages.forEach(([price,duration])=>{
  const card=document.createElement('div');card.className='package';
  const p=document.createElement('div');p.className='price';p.textContent='৳'+price;
  const d=document.createElement('div');d.className='duration';d.textContent=duration;
  card.append(p,d);grid.append(card);
- const opt=document.createElement('option');opt.value=price+' টাকা — '+duration;opt.textContent='৳'+price+' — '+duration;select.append(opt);
 });
 document.getElementById('year').textContent=new Date().getFullYear();
-document.getElementById('rechargeForm').addEventListener('submit',e=>{
- e.preventDefault();
- const data={name:document.getElementById('customer').value,phone:document.getElementById('phone').value,package:select.value,payment:document.getElementById('method').value,transaction:document.getElementById('trx').value};
- const msg='Mahim UltraNet WiFi রিচার্জ আবেদন%0Aনাম: '+encodeURIComponent(data.name)+'%0Aমোবাইল: '+encodeURIComponent(data.phone)+'%0Aপ্যাকেজ: '+encodeURIComponent(data.package)+'%0Aপেমেন্ট: '+encodeURIComponent(data.payment)+'%0ATransaction ID: '+encodeURIComponent(data.transaction);
- document.getElementById('formStatus').innerHTML='আবেদনের তথ্য প্রস্তুত। WhatsApp-এ অ্যাডমিনকে পাঠাতে নিচের লিংকে চাপ দিন: <a target="_blank" rel="noopener" href="https://wa.me/8801723054631?text='+msg+'">WhatsApp-এ আবেদন পাঠান</a>। অ্যাডমিন যাচাই না করা পর্যন্ত রিচার্জ সম্পন্ন হবে না।';
-});
+
 </script>
 </body></html>
