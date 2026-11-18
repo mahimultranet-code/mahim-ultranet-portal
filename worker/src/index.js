@@ -749,7 +749,10 @@ export default {
           if (!(await rateLimit(env.DB, request, "admin-emergency-activation", String(admin.id)))) return fail("too_many_attempts", 429, cors);
           const results = await env.DB.batch([
             env.DB.prepare(
-              "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT e.id, e.customer_id, ? FROM emergency_requests e WHERE e.id = ? AND e.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = e.id) AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0)",
+              "UPDATE emergency_requests SET access_status = 'active', router_id = COALESCE(router_id, (SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1)), expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+300 minutes') WHERE id = ? AND status = 'approved' AND access_status = 'pending'",
+            ).bind(requestId),
+            env.DB.prepare(
+              "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT e.id, e.customer_id, ? FROM emergency_requests e WHERE e.id = ? AND e.status = 'approved' AND e.access_status = 'active' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = e.id) AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0)",
             ).bind(admin.id, requestId),
             env.DB.prepare(
               "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? AND changes() = 1 ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
