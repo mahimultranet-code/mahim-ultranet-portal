@@ -125,6 +125,30 @@ export async function handleRouterAgent(request, env, url) {
             queuedOrders++;
           }
         }
+        const emergencyPending = await env.DB.prepare(
+          `SELECT e.id, c.mikrotik_username
+           FROM emergency_requests e JOIN customers c ON c.id = e.customer_id
+           WHERE e.status = 'approved' AND e.access_status = 'pending'
+             AND e.router_id IS NULL AND c.mikrotik_username IS NOT NULL
+           ORDER BY e.id ASC LIMIT 100`,
+        ).all();
+        for (const item of emergencyPending.results || []) {
+          if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username || "")) continue;
+          const payload = JSON.stringify({
+            emergency_request_id: Number(item.id),
+            username: item.mikrotik_username,
+            service_type: "hotspot",
+            profile: "Mahim-Hotspot-5M",
+            duration_minutes: 300,
+          });
+          const queued = await env.DB.prepare(
+            "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_activate', ?, ?)",
+          ).bind(enrolled.id, payload, "activate:emergency:" + item.id).run();
+          if (Number(queued.meta?.changes || 0) === 1) {
+            await env.DB.prepare("UPDATE emergency_requests SET router_id = ? WHERE id = ? AND access_status = 'pending'").bind(enrolled.id, item.id).run();
+            queuedOrders++;
+          }
+        }
       }
       return response({ ok: true, router_key: routerKey, router_token: plainToken, queued_orders: queuedOrders, message: "store_token_securely_once" }, 201);
     }
