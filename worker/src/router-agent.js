@@ -140,12 +140,39 @@ export async function handleRouterAgent(request, env, url) {
       if (!Number.isSafeInteger(jobId) || !["applied", "failed"].includes(status)) {
         return response({ ok: false, error: "invalid_acknowledgement" }, 400);
       }
+      const leasedJob = await env.DB.prepare(
+        "SELECT job_type, payload_json FROM router_jobs WHERE id = ? AND router_id = ? AND status = 'leased' LIMIT 1",
+      ).bind(jobId, router.id).first();
+      if (!leasedJob) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
+      let jobPayload;
+      try { jobPayload = JSON.parse(leasedJob.payload_json); } catch { return response({ ok: false, error: "invalid_job_payload" }, 500); }
+      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type)) {
+        if (!Number.isSafeInteger(Number(jobPayload.customer_package_id)) ||
+            !Number.isSafeInteger(Number(jobPayload.duration_minutes)) ||
+            Number(jobPayload.duration_minutes) < 1 ||
+            !["hotspot", "pppoe"].includes(jobPayload.service_type)) {
+          return response({ ok: false, error: "invalid_activation_job_payload" }, 422);
+        }
+      }
       const details = JSON.stringify(body.details ?? {}).slice(0, 2000);
       const result = await env.DB.prepare(
         `UPDATE router_jobs SET status = ?, result_json = ?, completed_at = CURRENT_TIMESTAMP, lease_until = NULL
          WHERE id = ? AND router_id = ? AND status = 'leased'`,
       ).bind(status, details, jobId, router.id).run();
       if (Number(result.meta?.changes || 0) !== 1) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
+      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type)) {
+        await env.DB.prepare(
+          `UPDATE customer_packages
+           SET status = 'active',
+               started_at = COALESCE(started_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+               expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || ? || ' minutes')
+           WHERE id = ? AND status = 'pending' AND router_id = ?`,
+        ).bind(Number(jobPayload.duration_minutes), Number(jobPayload.customer_package_id), router.id).run();
+      } else if (status === "applied" && leasedJob.job_type === "disable_access") {
+        await env.DB.prepare(
+          "UPDATE customer_packages SET status = 'expired' WHERE id = ? AND router_id = ? AND status IN ('active', 'expiring')",
+        ).bind(Number(jobPayload.customer_package_id), router.id).run();
+      }
       await env.DB.prepare(
         "INSERT INTO router_events (router_id, job_id, event_type, details_json) VALUES (?, ?, ?, ?)",
       ).bind(router.id, jobId, status, details).run();
