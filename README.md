@@ -17,8 +17,8 @@ The portal is structured as a Progressive Web App. Once staging has passed its h
 - API and portal changes are on `feature/secure-portal-backend`; `main` is unchanged.
 - Staging Worker: `mahim-ultranet-api-v2-staging`.
 - Staging D1: `mahim-ultranet-db-staging`, bound as `DB` in `worker/wrangler.toml`.
-- Cloudflare Builds must use branch `feature/secure-portal-backend`, root directory `worker`, and deploy command `npx wrangler deploy`.
-- Apply migrations `0001_initial.sql`, `0002_emergency_debt.sql`, `0003_seed_packages.sql`, and `0004_update_five_hour_package_price.sql` to staging D1 only, in order.
+- Cloudflare Builds must use branch `feature/secure-portal-backend`, root directory `worker`, and staging-only deploy command `npx wrangler d1 migrations apply mahim-ultranet-db-staging --remote && npx wrangler deploy`.
+- The staging deploy command applies pending migrations `0001_initial.sql` through `0004_update_five_hour_package_price.sql` to staging D1 only, in order, before deploying. Confirm migration success in the Cloudflare Build log.
 - The five-hour Hotspot package is ৳20. Emergency Internet is ৳20 for 5 hours and requires an account at least 3 months old plus 10 approved recharges of at least ৳10 each.
 - Payment submissions remain pending until admin approval. Package orders remain pending and do not activate Internet.
 - RouterOS activation/polling is not implemented. Do not advertise live package or emergency activation until the router integration is built and verified.
