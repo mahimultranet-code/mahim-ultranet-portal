@@ -995,5 +995,31 @@ export default {
         ).bind(item.id).run();
       }
     }
+    const emergencyExpired = await env.DB.prepare(
+      `SELECT e.id, e.router_id, c.mikrotik_username
+       FROM emergency_requests e
+       JOIN customers c ON c.id = e.customer_id
+       WHERE e.status = 'approved' AND e.access_status = 'active'
+         AND e.router_id IS NOT NULL AND e.expires_at IS NOT NULL
+         AND e.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       ORDER BY e.expires_at ASC LIMIT 100`,
+    ).all();
+    for (const item of emergencyExpired.results || []) {
+      if (typeof item.mikrotik_username !== "string" ||
+          !/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username)) continue;
+      const payload = JSON.stringify({
+        emergency_request_id: Number(item.id),
+        username: item.mikrotik_username,
+        service_type: "hotspot",
+      });
+      const queued = await env.DB.prepare(
+        "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_expire', ?, ?)",
+      ).bind(item.router_id, payload, "expire:emergency:" + item.id).run();
+      if (Number(queued.meta?.changes || 0) === 1) {
+        await env.DB.prepare(
+          "UPDATE emergency_requests SET access_status = 'expiring' WHERE id = ? AND access_status = 'active'",
+        ).bind(item.id).run();
+      }
+    }
   },
 };
