@@ -45,14 +45,17 @@ jobs:
               def handle_endtag(self, tag):
                   if tag == 'script' and self.active:
                       self.parts.append(''.join(self.current)); self.active = False
-          parser = Scripts()
-          parser.feed(Path('portal-app.html').read_text(encoding='utf-8'))
           out = Path('/tmp/portal-inline-js'); out.mkdir(exist_ok=True)
           count = 0
-          for script in parser.parts:
-              if script.strip():
-                  count += 1; (out / ('script-' + str(count) + '.js')).write_text(script, encoding='utf-8')
-          print('Extracted', count, 'inline script block(s)')
+          for html in ('portal-app.html', 'index.html'):
+              parser = Scripts()
+              parser.feed(Path(html).read_text(encoding='utf-8'))
+              for script in parser.parts:
+                  if script.strip():
+                      count += 1
+                      (out / ('script-' + str(count) + '.js')).write_text(script, encoding='utf-8')
+              print('Parsed inline scripts:', html)
+          print('Extracted', count, 'inline script block(s) across customer portal entry points')
           PY
           for file in /tmp/portal-inline-js/*.js; do node --check "$file"; done
       - name: Validate D1 migrations against SQLite
