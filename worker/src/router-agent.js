@@ -129,7 +129,7 @@ export async function handleRouterAgent(request, env, url) {
           `SELECT e.id, c.mikrotik_username
            FROM emergency_requests e JOIN customers c ON c.id = e.customer_id
            WHERE e.status = 'approved' AND e.access_status = 'pending'
-             AND e.router_id IS NULL AND c.mikrotik_username IS NOT NULL
+             AND e.approved_by IS NOT NULL AND e.router_id IS NULL AND c.mikrotik_username IS NOT NULL
            ORDER BY e.id ASC LIMIT 100`,
         ).all();
         for (const item of emergencyPending.results || []) {
