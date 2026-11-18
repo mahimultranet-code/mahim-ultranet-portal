@@ -30,7 +30,7 @@
     :if ([:typeof $jobId] = "nil" || [:typeof $username] = "nil") do={ :error "Invalid job payload"; }
     :if ([:len $username] < 1 || [:len $username] > 64) do={ :error "Invalid username"; }
 
-    :if ($jobType = "activate_hotspot") do={
+    :if ($jobType = "activate_hotspot" || $jobType = "emergency_activate") do={
         :if ($serviceType != "hotspot" || $profile != "Mahim-Hotspot-5M") do={ :error "Unexpected Hotspot profile"; }
         :if ([:len [/ip hotspot user profile find where name=$profile]] = 0) do={ :error "Hotspot profile missing"; }
         :local userIds [/ip hotspot user find where name=$username];
@@ -44,7 +44,7 @@
             :if ([:len $userIds] = 0) do={ :error "Existing PPPoE secret missing"; }
             /ppp secret set ($userIds->0) profile=$profile disabled=no;
         } else={
-            :if ($jobType = "disable_access") do={
+            :if ($jobType = "disable_access" || $jobType = "emergency_expire") do={
                 :if ($serviceType = "hotspot") do={
                     :local userIds [/ip hotspot user find where name=$username];
                     :if ([:len $userIds] = 0) do={ :error "Hotspot user missing during expiry"; }
