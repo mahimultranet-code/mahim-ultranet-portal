@@ -696,7 +696,7 @@ export default {
               "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT e.id, e.customer_id, ? FROM emergency_requests e WHERE e.id = ? AND e.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = e.id) AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0)",
             ).bind(admin.id, requestId),
             env.DB.prepare(
-              "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
+              "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? AND changes() = 1 ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
             ).bind(requestId),
             env.DB.prepare(
               "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_routeros_activation_confirmed', 'emergency_request_id=' || ? WHERE changes() = 1",
