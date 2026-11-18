@@ -36,6 +36,21 @@ async function readBody(request) {
   return JSON.parse(text);
 }
 
+
+async function enrollmentRateLimit(db, request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const key = await digest("router-enroll|" + ip);
+  const now = Math.floor(Date.now() / 1000);
+  await db.prepare(
+    `INSERT INTO rate_limits (rate_key, window_started_at, attempts) VALUES (?, ?, 1)
+     ON CONFLICT(rate_key) DO UPDATE SET
+       attempts = CASE WHEN window_started_at <= ? THEN 1 ELSE attempts + 1 END,
+       window_started_at = CASE WHEN window_started_at <= ? THEN ? ELSE window_started_at END`,
+  ).bind(key, now, now - 900, now - 900, now).run();
+  const row = await db.prepare("SELECT attempts FROM rate_limits WHERE rate_key = ?").bind(key).first();
+  return Number(row?.attempts || 0) <= 5;
+}
+
 async function authenticate(request, db) {
   const authorization = request.headers.get("Authorization") || "";
   if (!authorization.startsWith(TOKEN_PREFIX)) return null;
@@ -53,6 +68,7 @@ export async function handleRouterAgent(request, env, url) {
 
   try {
     if (url.pathname === "/router/enroll" && request.method === "POST") {
+      if (!(await enrollmentRateLimit(env.DB, request))) return response({ ok: false, error: "too_many_attempts" }, 429);
       if (typeof env.ROUTER_ENROLLMENT_SECRET !== "string" || env.ROUTER_ENROLLMENT_SECRET.length < 32) {
         return response({ ok: false, error: "router_enrollment_unavailable" }, 503);
       }
@@ -85,6 +101,9 @@ export async function handleRouterAgent(request, env, url) {
       if (!router) return response({ ok: false, error: "unauthorized" }, 401);
       const now = new Date().toISOString();
       await env.DB.prepare("UPDATE routers SET last_seen_at = ? WHERE id = ?").bind(now, router.id).run();
+      await env.DB.prepare(
+        "UPDATE router_jobs SET status = 'failed', completed_at = CURRENT_TIMESTAMP WHERE router_id = ? AND status = 'leased' AND attempts >= 8 AND lease_until < datetime('now')",
+      ).bind(router.id).run();
       const job = await env.DB.prepare(
         `UPDATE router_jobs
          SET status = 'leased', attempts = attempts + 1,
