@@ -886,6 +886,25 @@ export default {
               queuedOrders++;
             }
           }
+          const emergencyPending = await env.DB.prepare(
+            "SELECT id FROM emergency_requests WHERE customer_id = ? AND status = 'approved' AND access_status = 'pending' AND router_id IS NULL ORDER BY id ASC LIMIT 20",
+          ).bind(customerId).all();
+          for (const item of emergencyPending.results || []) {
+            const payload = JSON.stringify({
+              emergency_request_id: Number(item.id),
+              username,
+              service_type: "hotspot",
+              profile: "Mahim-Hotspot-5M",
+              duration_minutes: 300,
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_activate', ?, ?)",
+            ).bind(router.id, payload, "activate:emergency:" + item.id).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE emergency_requests SET router_id = ? WHERE id = ? AND access_status = 'pending'").bind(router.id, item.id).run();
+              queuedOrders++;
+            }
+          }
         }
         return json({ ok: true, customer_id: customerId, mikrotik_username: username, queued_orders: queuedOrders }, 200, cors);
       }
