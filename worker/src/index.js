@@ -898,4 +898,33 @@ export default {
 
     return fail("not_found", 404, cors);
   },
+  async scheduled(controller, env, ctx) {
+    if (!env.DB) return;
+    const expired = await env.DB.prepare(
+      `SELECT cp.id, cp.router_id, cp.service_type, c.mikrotik_username
+       FROM customer_packages cp
+       JOIN customers c ON c.id = cp.customer_id
+       WHERE cp.status = 'active' AND cp.router_id IS NOT NULL
+         AND cp.expires_at IS NOT NULL
+         AND cp.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       ORDER BY cp.expires_at ASC LIMIT 100`,
+    ).all();
+    for (const item of expired.results || []) {
+      if (typeof item.mikrotik_username !== "string" ||
+          !/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username)) continue;
+      const payload = JSON.stringify({
+        customer_package_id: Number(item.id),
+        username: item.mikrotik_username,
+        service_type: item.service_type,
+      });
+      const queued = await env.DB.prepare(
+        "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'disable_access', ?, ?)",
+      ).bind(item.router_id, payload, "expire:package:" + item.id).run();
+      if (Number(queued.meta?.changes || 0) === 1) {
+        await env.DB.prepare(
+          "UPDATE customer_packages SET status = 'expiring' WHERE id = ? AND status = 'active'",
+        ).bind(item.id).run();
+      }
+    }
+  },
 };
