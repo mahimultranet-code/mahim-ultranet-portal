@@ -16,3 +16,9 @@ binding = "DB"
 database_name = "mahim-ultranet-db-staging"
 database_id = "36003129-58ce-4e10-9df4-709d3abb22f1"
 migrations_dir = "migrations"
+
+# Preview deployments must use the staging D1 database, never production.
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "mahim-ultranet-db-staging"
+database_id = "36003129-58ce-4e10-9df4-709d3abb22f1"
