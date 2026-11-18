@@ -219,6 +219,12 @@ export async function handleRouterAgent(request, env, url) {
           return response({ ok: false, error: "invalid_emergency_job_payload" }, 422);
         }
       }
+      if (status === "applied" && leasedJob.job_type === "emergency_expire") {
+        if (!Number.isSafeInteger(Number(jobPayload.emergency_request_id)) ||
+            jobPayload.service_type !== "hotspot") {
+          return response({ ok: false, error: "invalid_emergency_expiry_payload" }, 422);
+        }
+      }
       const details = JSON.stringify(body.details ?? {}).slice(0, 2000);
       const result = await env.DB.prepare(
         `UPDATE router_jobs SET status = ?, result_json = ?, completed_at = CURRENT_TIMESTAMP, lease_until = NULL
