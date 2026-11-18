@@ -4,46 +4,32 @@ Mahim UltraNet customer self-service portal and Cloudflare Worker API.
 
 ## Customer portal preview
 
-The API-connected mobile-first portal is in `portal-app.html`. It includes:
+The API-connected mobile-first portal is in `portal-app.html`. It includes customer registration/login, wallet, package requests, bKash/Nagad payment submission, complaints, password-reset requests, administrator workflows, and the ৳20 emergency Internet request workflow.
 
-- Customer registration, login, session check and logout
-- Wallet balance and transaction history
-- Active Hotspot/PPPoE package catalogue and purchase requests
-- bKash/Nagad payment submission (pending until an administrator verifies it)
-- Customer complaints and replies
-- Customer password-reset requests and administrator-managed password replacement with session revocation
-- ৳20 emergency Internet request workflow, admin approval queue, and debt-first recharge settlement (requires D1 migration 0002)
-- Basic administrator dashboard and package creation
-- PWA manifest, app icon and an offline shell service worker
-
-The existing `index.html` and premium preview files have intentionally not been replaced.
+The portal API URL is configured for the separate staging Worker. The existing `index.html` and premium preview files have intentionally not been replaced.
 
 ## Android app preparation
 
-The portal is structured as a Progressive Web App. Once it is safely published over HTTPS and the API is deployed and verified, open the portal in Android Chrome and use **Install app** or **Add to Home screen**. A Trusted Web Activity/APK can be prepared later if required.
+The portal is structured as a Progressive Web App. Once staging has passed its health, database, authentication, and browser-cookie tests, it can be installed from Android Chrome. A Trusted Web Activity/APK can be prepared later.
 
-## Important deployment status
+## Deployment status and safety
 
-- The API-connected portal and Worker source are committed to `feature/secure-portal-backend`.
-- The existing `main` branch has not been changed.
-- The Worker source has **not** been deployed to Cloudflare yet. The existing production Worker may still return `Hello World!`.
-- `worker/wrangler.toml` defines an isolated staging Worker named `mahim-ultranet-api-v2-staging`, with its D1 binding pointed at `mahim-ultranet-db-staging`. Cloudflare Builds must use repository root `worker/` and branch `feature/secure-portal-backend`.
-- The migration directory contains baseline schema `0001`, emergency debt migration `0002`, package seed migration `0003`, and five-hour package price update `0004`. Apply them in order to the staging D1 database only.
-- Do not accept real payments or promise live Internet activation until the Worker, D1 schema, cookie/session behavior and RouterOS integration have been tested end-to-end.
-- The portal currently calls the production Worker URL `https://mahim-ultranet-api-v2.mahimultranet.workers.dev`; staging deployment does not switch the portal to staging automatically. Update the portal API URL only after staging health and auth tests pass.
-- The portal's cross-site Secure cookie must be tested in Android Chrome; browser third-party-cookie restrictions may require putting the API on a same-site custom domain before production.
-- Package orders remain pending until a verified RouterOS activation bridge is implemented.
+- API and portal changes are on `feature/secure-portal-backend`; `main` is unchanged.
+- Staging Worker: `mahim-ultranet-api-v2-staging`.
+- Staging D1: `mahim-ultranet-db-staging`, bound as `DB` in `worker/wrangler.toml`.
+- Cloudflare Builds must use branch `feature/secure-portal-backend`, root directory `worker`, and deploy command `npx wrangler deploy`.
+- Apply migrations `0001_initial.sql`, `0002_emergency_debt.sql`, `0003_seed_packages.sql`, and `0004_update_five_hour_package_price.sql` to staging D1 only, in order.
+- The five-hour Hotspot package is ৳20. Emergency Internet is ৳20 for 5 hours and requires an account at least 3 months old plus 10 approved recharges of at least ৳10 each.
+- Payment submissions remain pending until admin approval. Package orders remain pending and do not activate Internet.
+- RouterOS activation/polling is not implemented. Do not advertise live package or emergency activation until the router integration is built and verified.
+- Do not accept real payments until staging health, migrations, admin bootstrap, customer authentication, wallet/payment workflows, cookie behavior, and RouterOS integration are fully tested.
+- Keep the production Worker and production D1 untouched during staging work. Never expose Worker secrets or MikroTik credentials.
 
 ## Main files
 
-- `portal-app.html` — API-connected customer portal
-- `manifest.webmanifest` — PWA install metadata
-- `sw.js` — static app-shell caching
-- `icon.svg` — application icon
+- `portal-app.html` — API-connected mobile-first portal
+- `manifest.webmanifest`, `sw.js`, `icon.svg` — PWA assets
 - `worker/src/index.js` — Cloudflare Worker API
 - `worker/wrangler.toml` — isolated staging deployment configuration
-- `worker/migrations/0001_initial.sql` — baseline D1 schema
-- `worker/migrations/0002_emergency_debt.sql` — emergency debt accounting
-- `worker/migrations/0003_seed_packages.sql` — 40 Hotspot + 1 PPPoE starter packages (5-hour Hotspot package ৳20)
-- `worker/migrations/0004_update_five_hour_package_price.sql` — upgrades an existing 5-hour Hotspot package from ৳6 to ৳20
-- `worker/README.md` — API deployment and test notes
+- `worker/migrations/` — ordered staging D1 migrations
+- `worker/README.md` — deployment and test instructions
