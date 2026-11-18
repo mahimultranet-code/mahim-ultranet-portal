@@ -92,11 +92,11 @@ export async function handleRouterAgent(request, env, url) {
          WHERE id = (
            SELECT id FROM router_jobs
            WHERE router_id = ? AND attempts < 8
-             AND (status = 'queued' OR (status = 'leased' AND lease_until < ?))
+             AND (status = 'queued' OR (status = 'leased' AND lease_until < datetime('now')))
            ORDER BY id ASC LIMIT 1
          )
          RETURNING id, job_type, payload_json, idempotency_key, attempts`,
-      ).bind(router.id, now).first();
+      ).bind(router.id).first();
       if (!job) return response({ ok: true, job: null, server_time: now });
       return response({
         ok: true,
