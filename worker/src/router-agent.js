@@ -198,7 +198,7 @@ export async function handleRouterAgent(request, env, url) {
         return response({ ok: false, error: "invalid_acknowledgement" }, 400);
       }
       const leasedJob = await env.DB.prepare(
-        "SELECT job_type, payload_json FROM router_jobs WHERE id = ? AND router_id = ? AND status = 'leased' LIMIT 1",
+        "SELECT job_type, payload_json, attempts FROM router_jobs WHERE id = ? AND router_id = ? AND status = 'leased' LIMIT 1",
       ).bind(jobId, router.id).first();
       if (!leasedJob) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
       let jobPayload;
@@ -226,10 +226,15 @@ export async function handleRouterAgent(request, env, url) {
         }
       }
       const details = JSON.stringify(body.details ?? {}).slice(0, 2000);
+      // Failed executions are retried with a bounded attempt count. A failure
+      // never activates access or creates emergency debt.
+      const retry = status === "failed" && Number(leasedJob.attempts || 0) < 8;
+      const storedStatus = retry ? "queued" : status;
       const result = await env.DB.prepare(
-        `UPDATE router_jobs SET status = ?, result_json = ?, completed_at = CURRENT_TIMESTAMP, lease_until = NULL
+        `UPDATE router_jobs
+         SET status = ?, result_json = ?, completed_at = ?, lease_until = NULL
          WHERE id = ? AND router_id = ? AND status = 'leased'`,
-      ).bind(status, details, jobId, router.id).run();
+      ).bind(storedStatus, details, retry ? null : new Date().toISOString(), jobId, router.id).run();
       if (Number(result.meta?.changes || 0) !== 1) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
       if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type)) {
         await env.DB.prepare(
@@ -265,8 +270,8 @@ export async function handleRouterAgent(request, env, url) {
       }
       await env.DB.prepare(
         "INSERT INTO router_events (router_id, job_id, event_type, details_json) VALUES (?, ?, ?, ?)",
-      ).bind(router.id, jobId, status, details).run();
-      return response({ ok: true, job_id: jobId, status });
+      ).bind(router.id, jobId, retry ? "retry_queued" : storedStatus, details).run();
+      return response({ ok: true, job_id: jobId, status: storedStatus, retrying: retry });
     }
 
     return response({ ok: false, error: "not_found" }, 404);
