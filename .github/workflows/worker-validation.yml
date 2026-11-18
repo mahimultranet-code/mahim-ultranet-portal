@@ -1,0 +1,44 @@
+name: Worker validation
+
+on:
+  pull_request:
+    paths:
+      - "worker/**"
+      - ".github/workflows/worker-validation.yml"
+  push:
+    branches:
+      - "feature/routeros-outbound-agent"
+    paths:
+      - "worker/**"
+      - ".github/workflows/worker-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check Worker JavaScript syntax
+        run: |
+          node --check worker/src/index.js
+          node --check worker/src/router-agent.js
+      - name: Validate D1 migrations against SQLite
+        run: |
+          python3 - <<'PY'
+          import glob, sqlite3
+          db = sqlite3.connect(":memory:")
+          db.execute("PRAGMA foreign_keys = ON")
+          for path in sorted(glob.glob("worker/migrations/*.sql")):
+              try:
+                  db.executescript(open(path, encoding="utf-8").read())
+                  print("OK", path)
+              except Exception as exc:
+                  raise SystemExit(f"FAILED {path}: {exc}")
+          PY
+      - name: Build Worker with Wrangler
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/mahim-ultranet-worker-build --config worker/wrangler.toml
