@@ -373,6 +373,14 @@ export default {
           "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE id = ? AND is_active = 1 AND NOT (service_type = 'hotspot' AND duration_minutes = 300 AND duration = '৫ ঘণ্টা') LIMIT 1",
         ).bind(packageId).first();
         if (!pkg) return fail("package_not_available", 404, cors);
+        const reference = "pkg:" + customer.id + ":" + idempotencyKey;
+        const existing = await env.DB.prepare(
+          "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? AND reference = ? LIMIT 1",
+        ).bind(customer.id, reference).first();
+        if (existing) {
+          return json({ ok: true, replayed: true, transaction: existing, activation_status: "pending" }, 200, cors);
+        }
+
         // Do not overlap a customer's access windows. The RouterOS executor disables
         // an account at expiry, so a second package/emergency session on the same
         // service could otherwise be cut off by the first session's expiry job.
@@ -390,14 +398,6 @@ export default {
            LIMIT 1`,
         ).bind(customer.id, pkg.service_type, customer.id, pkg.service_type).first();
         if (accessConflict) return fail("active_or_pending_access_exists", 409, cors);
-
-        const reference = "pkg:" + customer.id + ":" + idempotencyKey;
-        const existing = await env.DB.prepare(
-          "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? AND reference = ? LIMIT 1",
-        ).bind(customer.id, reference).first();
-        if (existing) {
-          return json({ ok: true, replayed: true, transaction: existing, activation_status: "pending" }, 200, cors);
-        }
 
         const results = await env.DB.batch([
           env.DB.prepare(
