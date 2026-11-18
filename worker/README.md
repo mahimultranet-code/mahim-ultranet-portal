@@ -45,9 +45,9 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 
 The source is not considered deployed merely because GitHub is connected. After Cloudflare Builds completes:
 
-1. Call GET /health and confirm D1 connectivity.
-2. Apply the four migrations above to staging D1 only, in order.
-3. Confirm the database schema and required unique wallet transaction reference index.
+1. Confirm the Build root directory is `worker` and the branch is `feature/secure-portal-backend`.
+2. The deploy command above applies pending migrations to the staging D1 database (`--remote`) before deploying the staging Worker. Verify the build log shows each migration succeeded.
+3. Call GET /health and confirm D1 connectivity, then verify the database schema and required unique wallet transaction reference index.
 4. Configure ADMIN_SETUP_SECRET securely and perform the one-time admin bootstrap.
 5. Test admin login/session, customer registration/login, customer isolation, wallet reads, payment submission, approval/rejection, package purchase idempotency, complaints, package management, and package-order visibility.
 6. Test emergency eligibility, duplicate pending-request prevention, admin approval/rejection, the ৳20 debt record, debt settlement from recharge, and repeated-approval protection.
