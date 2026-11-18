@@ -13,3 +13,19 @@ Tokens are stored as SHA-256 hashes. Poll and acknowledgement require TLS plus t
 ## Safety and current limits
 
 This commit creates the authenticated transport and durable job queue only. It does not yet create or execute customer provisioning jobs. The RouterOS script, least-privilege router permissions, package-to-job mapping, job idempotency, and end-to-end staging tests are still required. Do not deploy or enroll a live router until those pieces are completed and reviewed. Keep RouterOS API and API-SSL inaccessible from WAN; this design does not need them exposed.
+
+## Package lifecycle wiring
+
+- A package purchase creates a durable activation job only when the customer has a mapped `mikrotik_username` and an enrolled router exists. Otherwise the package remains pending.
+- Admin mapping endpoint: `POST /admin/customers/{id}/mikrotik-username`, JSON body `{"mikrotik_username":"existing-router-login"}`. It also queues that customer's pending package orders.
+- Router acknowledgement of an activation job sets the matching package order to active and starts its duration.
+- Worker Cron runs every minute and queues a disable job after `expires_at`; successful router acknowledgement marks the package expired.
+- The RouterOS template only enables/disables existing Hotspot users or PPP secrets. It never creates accounts or sets/reuses passwords.
+
+## RouterOS template
+
+See `routeros/mahim-ultranet-agent-template.rsc`. Replace the staging Worker URL and one-time router token only after staging deployment/enrollment. It uses RouterOS JSON deserialization and HTTPS fetch. Test against a dedicated lab user first. The template intentionally does not create missing users, and a missing user/profile is reported as a failed job.
+
+## Not ready for live customer traffic
+
+The worker code and template are not yet deployed or validated end-to-end. No Cloudflare deployment, D1 migration, live router enrollment, or RouterOS changes have been performed. Emergency Internet activation is not yet wired to automatic router jobs. Keep production payments and live activation workflows unchanged until staging validation is complete.
