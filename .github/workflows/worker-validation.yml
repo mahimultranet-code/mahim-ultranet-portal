@@ -31,6 +31,8 @@ jobs:
         run: |
           node --check worker/src/index.js
           node --check worker/src/router-agent.js
+      - name: Run Worker health and CORS smoke tests
+        run: node --test worker/tests/*.test.js
       - name: Check portal inline JavaScript syntax
         run: |
           python3 - <<'PY'
