@@ -6,8 +6,8 @@
 :global ultranetApiBase "https://REPLACE-WITH-STAGING-WORKER-HOST";
 :global ultranetRouterToken "REPLACE-WITH-ONE-TIME-ROUTER-TOKEN";
 
-:if ([:len $ultranetApiBase] < 20 || [:find $ultranetApiBase "REPLACE-"] != nil) do={ :error "Set staging Worker URL first"; }
-:if ([:len $ultranetRouterToken] < 40 || [:find $ultranetRouterToken "REPLACE-"] != nil) do={ :error "Set router token first"; }
+:if ([:len $ultranetApiBase] < 20 || [:typeof [:find $ultranetApiBase "REPLACE-"]] != "nil") do={ :error "Set staging Worker URL first"; }
+:if ([:len $ultranetRouterToken] < 40 || [:typeof [:find $ultranetRouterToken "REPLACE-"]] != "nil") do={ :error "Set router token first"; }
 
 :local pollResult [/tool fetch url=($ultranetApiBase . "/router/poll") http-method=get http-header-field=("Authorization: Bearer " . $ultranetRouterToken) check-certificate=yes output=user as-value];
 :if (($pollResult->"status") != "finished") do={ :error "Router job poll failed"; }
