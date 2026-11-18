@@ -93,7 +93,40 @@ export async function handleRouterAgent(request, env, url) {
            token_hash = excluded.token_hash,
            enabled = 1`,
       ).bind(routerKey, routerName, version, await digest(plainToken)).run();
-      return response({ ok: true, router_key: routerKey, router_token: plainToken, message: "store_token_securely_once" }, 201);
+      const enrolled = await env.DB.prepare("SELECT id FROM routers WHERE router_key = ? LIMIT 1").bind(routerKey).first();
+      let queuedOrders = 0;
+      if (enrolled) {
+        const pending = await env.DB.prepare(
+          `SELECT cp.id, cp.service_type, cp.speed_mbps, p.duration_minutes, c.mikrotik_username
+           FROM customer_packages cp
+           JOIN customers c ON c.id = cp.customer_id
+           JOIN packages p ON p.id = cp.package_id
+           WHERE cp.status = 'pending' AND cp.router_id IS NULL
+             AND c.mikrotik_username IS NOT NULL
+           ORDER BY cp.id ASC LIMIT 100`,
+        ).all();
+        for (const item of pending.results || []) {
+          if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username || "")) continue;
+          const jobType = item.service_type === "pppoe" ? "activate_pppoe" : "activate_hotspot";
+          const profile = item.service_type === "pppoe" ? "Mahim-PPPoE-10M" : "Mahim-Hotspot-5M";
+          const payload = JSON.stringify({
+            customer_package_id: Number(item.id),
+            username: item.mikrotik_username,
+            service_type: item.service_type,
+            profile,
+            speed_mbps: Number(item.speed_mbps),
+            duration_minutes: Number(item.duration_minutes),
+          });
+          const queued = await env.DB.prepare(
+            "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, ?, ?, ?)",
+          ).bind(enrolled.id, jobType, payload, "activate:package:" + item.id).run();
+          if (Number(queued.meta?.changes || 0) === 1) {
+            await env.DB.prepare("UPDATE customer_packages SET router_id = ? WHERE id = ? AND status = 'pending'").bind(enrolled.id, item.id).run();
+            queuedOrders++;
+          }
+        }
+      }
+      return response({ ok: true, router_key: routerKey, router_token: plainToken, queued_orders: queuedOrders, message: "store_token_securely_once" }, 201);
     }
 
     if (url.pathname === "/router/poll" && request.method === "GET") {
