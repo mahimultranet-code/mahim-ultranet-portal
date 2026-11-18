@@ -399,6 +399,34 @@ export default {
           return fail(balance ? "insufficient_wallet_balance_or_duplicate_request" : "wallet_not_found", 409, cors);
         }
         const orderId = Number(results?.[2]?.meta?.last_row_id || 0);
+        let routerJobQueued = false;
+        if (orderId && typeof customer.mikrotik_username === "string" &&
+            /^[A-Za-z0-9_.@-]{1,64}$/.test(customer.mikrotik_username)) {
+          const router = await env.DB.prepare(
+            "SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1",
+          ).first();
+          if (router) {
+            const jobType = pkg.service_type === "pppoe" ? "activate_pppoe" : "activate_hotspot";
+            const profile = pkg.service_type === "pppoe" ? "Mahim-PPPoE-10M" : "Mahim-Hotspot-5M";
+            const payload = JSON.stringify({
+              customer_package_id: orderId,
+              username: customer.mikrotik_username,
+              service_type: pkg.service_type,
+              profile,
+              speed_mbps: Number(pkg.speed_mbps),
+              duration_minutes: Number(pkg.duration_minutes),
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, ?, ?, ?)",
+            ).bind(router.id, jobType, payload, "activate:package:" + orderId).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare(
+                "UPDATE customer_packages SET router_id = ? WHERE id = ? AND customer_id = ? AND status = 'pending'",
+              ).bind(router.id, orderId, customer.id).run();
+              routerJobQueued = true;
+            }
+          }
+        }
         const order = orderId ? await env.DB.prepare(
           "SELECT id, package_id, service_type, price_taka, speed_mbps, status, created_at FROM customer_packages WHERE id = ? AND customer_id = ? LIMIT 1",
         ).bind(orderId, customer.id).first() : null;
@@ -409,8 +437,10 @@ export default {
           ok: true,
           order,
           balance_taka: Number(wallet?.balance_taka || 0),
-          activation_status: "pending",
-          message: "payment_deducted_package_waiting_for_router_activation",
+          activation_status: routerJobQueued ? "queued_for_router" : "pending_router_setup",
+          message: routerJobQueued
+            ? "payment_deducted_router_activation_queued"
+            : "payment_deducted_waiting_for_router_username_and_enrollment",
         }, 201, cors);
       }
 
