@@ -25,7 +25,9 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - `src/router-agent.js` adds `POST /router/enroll`, `GET /router/poll`, and `POST /router/jobs/{id}/ack`.
 - Routers initiate HTTPS requests; no public inbound RouterOS API port is needed. Per-router bearer tokens are stored only as SHA-256 hashes in D1.
 - Set `ROUTER_ENROLLMENT_SECRET` as a Worker secret (minimum 32 characters) before enrollment. Enrollment returns a token once; keep it private.
-- This is transport scaffolding only: no provisioning jobs are enqueued yet, and no RouterOS script is ready. Do not enroll or connect the live router until command execution, expiry enforcement, and staging tests are complete.
+- Package purchases now enqueue activation jobs only when the customer already has a valid `mikrotik_username` and a router is enrolled. Router acknowledgement changes the package to active and starts its duration.
+- A one-minute Worker Cron queues expiry jobs for active package records. The RouterOS-side command executor is not yet implemented or tested, so these jobs must not be treated as live service activation/deactivation.
+- Do not enroll or connect the live router until the RouterOS executor, credential/account mapping, retry behavior, and staging end-to-end tests are complete.
 
 ## Database migrations
 
@@ -39,6 +41,7 @@ Apply these files to the isolated staging D1 database in this exact order:
 6. `0006_enforce_minimum_recharge.sql` — database-level guard rejects payment requests below ৳10.
 7. `0007_emergency_activation_confirmation.sql` — records admin confirmation before emergency debt is created.
 8. `0008_router_agent_queue.sql` — adds authenticated router registration, durable provisioning jobs, and event history.
+9. `0009_package_router_lifecycle.sql` — binds purchased package records to the router that accepted activation and indexes expiries.
 
 Take a D1 backup before applying migrations. Do not run these migrations against production as part of staging setup.
 
