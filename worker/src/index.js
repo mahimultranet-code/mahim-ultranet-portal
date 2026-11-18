@@ -495,7 +495,7 @@ export default {
         if (customer.role !== "customer") return fail("customer_account_required", 403, cors);
         if (!(await rateLimit(env.DB, request, "emergency-request", String(customer.id)))) return fail("too_many_attempts", 429, cors);
         const result = await env.DB.prepare(
-          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status = 'pending')",
+          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = ? AND (e2.status = 'pending' OR (e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))))",
         ).bind(customer.id, customer.id, customer.id, customer.id, customer.id).run();
         if (Number(result.meta?.changes || 0) !== 1) return fail("not_eligible_or_existing_debt_or_pending_request", 409, cors);
         return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, duration_minutes: 300, duration_hours: 5, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
@@ -680,7 +680,7 @@ export default {
         if (action === "approve") {
           const results = await env.DB.batch([
             env.DB.prepare(
-              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0)",
+              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = emergency_requests.customer_id AND e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))",
             ).bind(requestId),
             env.DB.prepare(
               "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_request_approved', 'emergency_request_id=' || ? WHERE changes() = 1",
