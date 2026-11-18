@@ -194,10 +194,11 @@ export default {
     const adminComplaintReply = url.pathname.match(/^\/admin\/complaints\/(\d+)\/reply$/);
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
+    const adminRouterUsernameAction = url.pathname.match(/^\/admin\/customers\/(\d+)\/mikrotik-username$/);
     const adminEmergencyAction = url.pathname.match(/^\/admin\/emergency\/(\d+)\/(approve|reject|activated)$/);
     const adminPasswordResetAction = url.pathname.match(/^\/admin\/password-resets\/(\d+)\/complete$/);
     const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency", "/password-reset/request", "/admin/password-resets"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction && !adminPasswordResetAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency", "/password-reset/request", "/admin/password-resets"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction && !adminPasswordResetAction && !adminRouterUsernameAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -819,6 +820,23 @@ export default {
           "SELECT c.id, c.name, c.mobile, c.email, c.is_verified, c.mikrotik_username, c.created_at, COALESCE(w.balance_taka, 0) AS balance_taka FROM customers c LEFT JOIN wallets w ON w.customer_id = c.id WHERE c.role = 'customer' AND (? = '' OR c.name LIKE '%' || ? || '%' OR c.mobile LIKE '%' || ? || '%') ORDER BY c.id DESC LIMIT ?",
         ).bind(search, search, search, limit).all();
         return json({ ok: true, customers: result.results || [] }, 200, cors);
+      }
+
+      if (adminRouterUsernameAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const customerId = Number(adminRouterUsernameAction[1]);
+        if (!Number.isSafeInteger(customerId) || customerId < 1) return fail("invalid_customer_id", 400, cors);
+        const body = await readJson(request);
+        const username = typeof body.mikrotik_username === "string" ? body.mikrotik_username.trim() : "";
+        if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(username)) return fail("invalid_mikrotik_username", 400, cors);
+        const results = await env.DB.batch([
+          env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ? AND role = 'customer'").bind(username, customerId),
+          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'customer_mikrotik_username_set', 'customer_id=' || ? WHERE changes() = 1").bind(admin.id, customerId),
+        ]);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("customer_not_found_or_username_already_in_use", 409, cors);
+        return json({ ok: true, customer_id: customerId, mikrotik_username: username }, 200, cors);
       }
 
       if (url.pathname === "/admin/payments" && request.method === "GET") {
