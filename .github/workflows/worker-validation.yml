@@ -5,6 +5,7 @@ on:
     paths:
       - "worker/**"
       - "portal-app.html"
+      - "index.html"
       - ".github/workflows/worker-validation.yml"
   push:
     branches:
@@ -70,6 +71,26 @@ jobs:
                   print("OK", path)
               except Exception as exc:
                   raise SystemExit(f"FAILED {path}: {exc}")
+
+          # Guard the actual seeded catalogue, not only SQL syntax.
+          hotspot = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='hotspot' AND is_active=1").fetchone()[0]
+          pppoe = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='pppoe' AND is_active=1").fetchone()[0]
+          emergency_catalogue = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='hotspot' AND duration_minutes=300 AND price_taka=20 AND is_active=1").fetchone()[0]
+          assert hotspot == 39, f"Expected 39 active regular Hotspot packages, got {hotspot}"
+          assert pppoe == 1, f"Expected 1 active PPPoE package, got {pppoe}"
+          assert emergency_catalogue == 0, "Emergency Internet must not appear in the regular package catalogue"
+          print("OK package catalogue: 39 Hotspot + 1 PPPoE; emergency offer separate")
+
+          # Confirm the database itself rejects recharge amounts below ৳10.
+          db.execute("INSERT INTO customers (name, mobile, password_hash) VALUES ('CI test', '01900000000', 'test-hash')")
+          customer_id = db.execute("SELECT id FROM customers WHERE mobile='01900000000'").fetchone()[0]
+          try:
+              db.execute("INSERT INTO payment_requests (customer_id, method, sender_mobile, transaction_id, amount_taka) VALUES (?, 'bkash', '01900000000', 'CI-UNDER-10', 9)", (customer_id,))
+              raise AssertionError("Database accepted a recharge below ৳10")
+          except sqlite3.IntegrityError as exc:
+              assert "minimum_recharge_is_10_taka" in str(exc), f"Unexpected rejection: {exc}"
+          db.execute("INSERT INTO payment_requests (customer_id, method, sender_mobile, transaction_id, amount_taka) VALUES (?, 'bkash', '01900000000', 'CI-10-OK', 10)", (customer_id,))
+          print("OK minimum recharge rule: ৳9 rejected; ৳10 accepted")
           PY
       - name: Build Worker with Wrangler
         run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/mahim-ultranet-worker-build --config worker/wrangler.toml
