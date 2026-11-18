@@ -20,6 +20,8 @@ This commit creates the authenticated transport and durable job queue only. It d
 - Admin mapping endpoint: `POST /admin/customers/{id}/mikrotik-username`, JSON body `{"mikrotik_username":"existing-router-login"}`. It also queues that customer's pending package orders.
 - Router acknowledgement of an activation job sets the matching package order to active and starts its duration.
 - Worker Cron runs every minute and queues a disable job after `expires_at`; successful router acknowledgement marks the package expired.
+- Emergency approval queues a five-hour Hotspot activation when a router and existing username are mapped. Only a successful router acknowledgement records the confirmation and creates the ৳20 debt.
+- The one-minute Worker Cron queues an emergency expiry job after five hours; successful acknowledgement marks the emergency access expired.
 - The RouterOS template only enables/disables existing Hotspot users or PPP secrets. It never creates accounts or sets/reuses passwords.
 
 ## RouterOS template
@@ -28,4 +30,4 @@ See `routeros/mahim-ultranet-agent-template.rsc`. Replace the staging Worker URL
 
 ## Not ready for live customer traffic
 
-The worker code and template are not yet deployed or validated end-to-end. No Cloudflare deployment, D1 migration, live router enrollment, or RouterOS changes have been performed. Emergency Internet activation is not yet wired to automatic router jobs. Keep production payments and live activation workflows unchanged until staging validation is complete.
+The worker code and template are not yet deployed or validated end-to-end. No Cloudflare deployment, D1 migration, live router enrollment, or RouterOS changes have been performed. Emergency Internet queueing and five-hour expiry are implemented on this feature branch but remain untested in staging. Keep production payments and live activation workflows unchanged until staging validation is complete.
