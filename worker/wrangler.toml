@@ -8,6 +8,9 @@ main = "src/index.js"
 compatibility_date = "2026-11-10"
 workers_dev = true
 
+[triggers]
+crons = ["*/1 * * * *"]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "mahim-ultranet-db-staging"
