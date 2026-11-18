@@ -1,3 +1,4 @@
+import { handleRouterAgent } from "./router-agent.js";
 const SERVICE = "mahim-ultranet-api-v2-staging";
 const ALLOWED_ORIGIN = "https://mahimultranet-code.github.io";
 const SESSION_COOKIE = "__Host-ultranet_session";
@@ -168,6 +169,9 @@ function publicCustomer(row) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/router/")) {
+      return handleRouterAgent(request, env, url);
+    }
     const cors = corsHeaders(request);
     const origin = request.headers.get("Origin");
 
