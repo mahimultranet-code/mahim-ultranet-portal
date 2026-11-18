@@ -26,6 +26,7 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Routers initiate HTTPS requests; no public inbound RouterOS API port is needed. Per-router bearer tokens are stored only as SHA-256 hashes in D1.
 - Set `ROUTER_ENROLLMENT_SECRET` as a Worker secret (minimum 32 characters) before enrollment. Enrollment returns a token once; keep it private.
 - Package purchases now enqueue activation jobs only when the customer already has a valid `mikrotik_username` and a router is enrolled. Router acknowledgement changes the package to active and starts its duration.
+- Overlapping access is blocked for the same customer/service while a package is `pending`, `active`, or `expiring`. Hotspot emergency access and a normal Hotspot package cannot overlap, preventing one session's expiry job from disabling another session.
 - A one-minute Worker Cron queues expiry jobs for active package records. Router-reported execution failures are requeued up to eight attempts; exhausted jobs remain failed for operator review.
 - Admins can map an existing RouterOS login to a portal customer with `POST /admin/customers/{id}/mikrotik-username` and JSON `{ "mikrotik_username": "existing-router-login" }`. The username must already exist on the router.
 - `routeros/mahim-ultranet-agent-template.rsc` is a RouterOS v7 executor template for existing Hotspot users and PPP secrets. It must be configured with the deployed staging Worker URL and one-time router token, then tested on a lab account before use.
