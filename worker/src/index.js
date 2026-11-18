@@ -840,7 +840,33 @@ export default {
           env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'customer_mikrotik_username_set', 'customer_id=' || ? WHERE changes() = 1").bind(admin.id, customerId),
         ]);
         if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("customer_not_found_or_username_already_in_use", 409, cors);
-        return json({ ok: true, customer_id: customerId, mikrotik_username: username }, 200, cors);
+        let queuedOrders = 0;
+        const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+        if (router) {
+          const pending = await env.DB.prepare(
+            "SELECT cp.id, cp.service_type, cp.speed_mbps, p.duration_minutes FROM customer_packages cp JOIN packages p ON p.id = cp.package_id WHERE cp.customer_id = ? AND cp.status = 'pending' AND cp.router_id IS NULL ORDER BY cp.id ASC LIMIT 50",
+          ).bind(customerId).all();
+          for (const item of pending.results || []) {
+            const jobType = item.service_type === "pppoe" ? "activate_pppoe" : "activate_hotspot";
+            const profile = item.service_type === "pppoe" ? "Mahim-PPPoE-10M" : "Mahim-Hotspot-5M";
+            const payload = JSON.stringify({
+              customer_package_id: Number(item.id),
+              username,
+              service_type: item.service_type,
+              profile,
+              speed_mbps: Number(item.speed_mbps),
+              duration_minutes: Number(item.duration_minutes),
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, ?, ?, ?)",
+            ).bind(router.id, jobType, payload, "activate:package:" + item.id).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE customer_packages SET router_id = ? WHERE id = ? AND status = 'pending'").bind(router.id, item.id).run();
+              queuedOrders++;
+            }
+          }
+        }
+        return json({ ok: true, customer_id: customerId, mikrotik_username: username, queued_orders: queuedOrders }, 200, cors);
       }
 
       if (url.pathname === "/admin/payments" && request.method === "GET") {
