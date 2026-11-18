@@ -19,6 +19,14 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Customer password-reset requests with a generic response to avoid account enumeration; admin can set a new password, revoke existing customer sessions, and create an audit entry.
 - Admin actions write audit-log entries where implemented.
 
+## RouterOS outbound agent (initial transport layer)
+
+- Migration `0008_router_agent_queue.sql` adds router registration, a durable job queue, and router event history.
+- `src/router-agent.js` adds `POST /router/enroll`, `GET /router/poll`, and `POST /router/jobs/{id}/ack`.
+- Routers initiate HTTPS requests; no public inbound RouterOS API port is needed. Per-router bearer tokens are stored only as SHA-256 hashes in D1.
+- Set `ROUTER_ENROLLMENT_SECRET` as a Worker secret (minimum 32 characters) before enrollment. Enrollment returns a token once; keep it private.
+- This is transport scaffolding only: no provisioning jobs are enqueued yet, and no RouterOS script is ready. Do not enroll or connect the live router until command execution, expiry enforcement, and staging tests are complete.
+
 ## Database migrations
 
 Apply these files to the isolated staging D1 database in this exact order:
@@ -45,7 +53,7 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 ## Required verification before accepting real payments
 
 1. Confirm the staging Worker and D1 are separate from production; back up staging D1 before migrations.
-2. Apply migrations 0001–0007 in order to staging D1 only and verify every migration in the build log.
+2. Apply migrations 0001–0008 in order to staging D1 only and verify every migration in the build log.
 3. Call GET /health and verify the schema, indexes, and migration state.
 4. Configure ADMIN_SETUP_SECRET securely and perform the one-time admin bootstrap.
 5. Test customer registration/login/logout, session expiry, customer isolation, and Android Chrome cookie behavior.
