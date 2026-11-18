@@ -72,9 +72,9 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 
 ## Not implemented — release blockers
 
-- MikroTik/RouterOS API integration for Hotspot and PPPoE provisioning.
-- Automatic 5-hour emergency session expiry and regular package expiry/renewal.
-- Router-side confirmation or polling; emergency activation is currently confirmed manually by an admin.
+- Live MikroTik/RouterOS rollout and end-to-end validation for Hotspot and PPPoE. The outbound transport, package queue, and RouterOS template exist on a feature branch only.
+- Automatic 5-hour emergency Internet activation/expiry; emergency flow remains manually confirmed by an admin.
+- Lab verification of RouterOS script execution, router profile prerequisites, acknowledgement retries, and package expiry.
 - Verified bKash/Nagad provider API or webhook reconciliation; payment approval is manual.
 - End-to-end Android Chrome verification of cross-site session cookies.
 - Full automated Worker + D1 integration test suite and verified staging test report.
@@ -84,7 +84,7 @@ Do not advertise automatic Internet activation or accept real customer payments 
 ## Safety gates
 
 - Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with guarded status transitions and unique ledger references.
-- Package purchase debits the wallet and creates a pending order. It does not activate Internet access.
+- Package purchase debits the wallet and creates a pending order; when a router and username are mapped it also queues an activation job. Internet access is not considered active until the enrolled router executes and acknowledges that job.
 - The admin package-order endpoint is read-only. Do not mark an order active before RouterOS activation and verification exist.
 - Emergency approval alone creates no debt. The admin must manually verify actual RouterOS activation before using the confirmation endpoint; that endpoint creates the ৳20 debt.
 - Existing debts created by earlier code are not automatically reversed; reconcile them case by case.
