@@ -187,6 +187,14 @@ export async function handleRouterAgent(request, env, url) {
           return response({ ok: false, error: "invalid_activation_job_payload" }, 422);
         }
       }
+      if (status === "applied" && leasedJob.job_type === "emergency_activate") {
+        if (!Number.isSafeInteger(Number(jobPayload.emergency_request_id)) ||
+            Number(jobPayload.duration_minutes) !== 300 ||
+            jobPayload.service_type !== "hotspot" ||
+            jobPayload.profile !== "Mahim-Hotspot-5M") {
+          return response({ ok: false, error: "invalid_emergency_job_payload" }, 422);
+        }
+      }
       const details = JSON.stringify(body.details ?? {}).slice(0, 2000);
       const result = await env.DB.prepare(
         `UPDATE router_jobs SET status = ?, result_json = ?, completed_at = CURRENT_TIMESTAMP, lease_until = NULL
@@ -205,6 +213,25 @@ export async function handleRouterAgent(request, env, url) {
         await env.DB.prepare(
           "UPDATE customer_packages SET status = 'expired' WHERE id = ? AND router_id = ? AND status IN ('active', 'expiring')",
         ).bind(Number(jobPayload.customer_package_id), router.id).run();
+      } else if (status === "applied" && leasedJob.job_type === "emergency_activate") {
+        await env.DB.batch([
+          env.DB.prepare(
+            "UPDATE emergency_requests SET router_id = ?, access_status = 'active', expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+300 minutes') WHERE id = ? AND status = 'approved' AND access_status = 'pending' AND approved_by IS NOT NULL",
+          ).bind(router.id, Number(jobPayload.emergency_request_id)),
+          env.DB.prepare(
+            "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT id, customer_id, approved_by FROM emergency_requests WHERE id = ? AND status = 'approved' AND access_status = 'active' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = emergency_requests.id)",
+          ).bind(Number(jobPayload.emergency_request_id)),
+          env.DB.prepare(
+            "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0) ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
+          ).bind(Number(jobPayload.emergency_request_id)),
+          env.DB.prepare(
+            "INSERT INTO admin_logs (admin_id, action, details) SELECT approved_by, 'emergency_routeros_activation_confirmed', 'emergency_request_id=' || id FROM emergency_requests WHERE id = ? AND access_status = 'active'",
+          ).bind(Number(jobPayload.emergency_request_id)),
+        ]);
+      } else if (status === "applied" && leasedJob.job_type === "emergency_expire") {
+        await env.DB.prepare(
+          "UPDATE emergency_requests SET access_status = 'expired' WHERE id = ? AND router_id = ? AND access_status IN ('active', 'expiring')",
+        ).bind(Number(jobPayload.emergency_request_id), router.id).run();
       }
       await env.DB.prepare(
         "INSERT INTO router_events (router_id, job_id, event_type, details_json) VALUES (?, ?, ?, ?)",
