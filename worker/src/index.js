@@ -890,7 +890,7 @@ export default {
             }
           }
           const emergencyPending = await env.DB.prepare(
-            "SELECT id FROM emergency_requests WHERE customer_id = ? AND status = 'approved' AND access_status = 'pending' AND router_id IS NULL ORDER BY id ASC LIMIT 20",
+            "SELECT id FROM emergency_requests WHERE customer_id = ? AND status = 'approved' AND access_status = 'pending' AND approved_by IS NOT NULL AND router_id IS NULL ORDER BY id ASC LIMIT 20",
           ).bind(customerId).all();
           for (const item of emergencyPending.results || []) {
             const payload = JSON.stringify({
