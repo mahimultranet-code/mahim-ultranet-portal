@@ -257,7 +257,7 @@ export async function handleRouterAgent(request, env, url) {
             "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT id, customer_id, approved_by FROM emergency_requests WHERE id = ? AND status = 'approved' AND access_status = 'active' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = emergency_requests.id)",
           ).bind(Number(jobPayload.emergency_request_id)),
           env.DB.prepare(
-            "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0) ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
+            "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP",
           ).bind(Number(jobPayload.emergency_request_id)),
           env.DB.prepare(
             "INSERT INTO admin_logs (admin_id, action, details) SELECT approved_by, 'emergency_routeros_activation_confirmed', 'emergency_request_id=' || id FROM emergency_requests WHERE id = ? AND access_status = 'active'",
