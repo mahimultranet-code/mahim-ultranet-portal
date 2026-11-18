@@ -346,7 +346,7 @@ export default {
 
       if (url.pathname === "/packages" && request.method === "GET") {
         const result = await env.DB.prepare(
-          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE is_active = 1 ORDER BY price_taka ASC, id ASC",
+          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE is_active = 1 AND NOT (service_type = 'hotspot' AND duration_minutes = 300 AND duration = '৫ ঘণ্টা') ORDER BY price_taka ASC, id ASC",
         ).all();
         return json({ ok: true, packages: result.results || [] }, 200, cors);
       }
@@ -365,7 +365,7 @@ export default {
           return fail("too_many_attempts", 429, cors);
         }
         const pkg = await env.DB.prepare(
-          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE id = ? AND is_active = 1 LIMIT 1",
+          "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE id = ? AND is_active = 1 AND NOT (service_type = 'hotspot' AND duration_minutes = 300 AND duration = '৫ ঘণ্টা') LIMIT 1",
         ).bind(packageId).first();
         if (!pkg) return fail("package_not_available", 404, cors);
         const reference = "pkg:" + customer.id + ":" + idempotencyKey;
