@@ -715,14 +715,35 @@ export default {
         if (action === "approve") {
           const results = await env.DB.batch([
             env.DB.prepare(
-              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = emergency_requests.customer_id AND e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))",
-            ).bind(requestId),
+              "UPDATE emergency_requests SET status = 'approved', approved_by = ? WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = emergency_requests.customer_id AND e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))",
+            ).bind(admin.id, requestId),
             env.DB.prepare(
               "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_request_approved', 'emergency_request_id=' || ? WHERE changes() = 1",
             ).bind(admin.id, requestId),
           ]);
           if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_eligible_or_debt_exists", 409, cors);
-          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, duration_minutes: 300, duration_hours: 5, activation_status: "awaiting_routeros_confirmation", debt_created: false }, 200, cors);
+          const emergency = await env.DB.prepare(
+            "SELECT e.customer_id, c.mikrotik_username FROM emergency_requests e JOIN customers c ON c.id = e.customer_id WHERE e.id = ? LIMIT 1",
+          ).bind(requestId).first();
+          const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+          let queued = false;
+          if (router && /^[A-Za-z0-9_.@-]{1,64}$/.test(emergency?.mikrotik_username || "")) {
+            const payload = JSON.stringify({
+              emergency_request_id: requestId,
+              username: emergency.mikrotik_username,
+              service_type: "hotspot",
+              profile: "Mahim-Hotspot-5M",
+              duration_minutes: 300,
+            });
+            const job = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_activate', ?, ?)",
+            ).bind(router.id, payload, "activate:emergency:" + requestId).run();
+            if (Number(job.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE emergency_requests SET router_id = ? WHERE id = ? AND status = 'approved'").bind(router.id, requestId).run();
+              queued = true;
+            }
+          }
+          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, duration_minutes: 300, duration_hours: 5, activation_status: queued ? "queued_for_router" : "pending_router_setup", debt_created: false }, 200, cors);
         }
         if (action === "activated") {
           if (!(await rateLimit(env.DB, request, "admin-emergency-activation", String(admin.id)))) return fail("too_many_attempts", 429, cors);
