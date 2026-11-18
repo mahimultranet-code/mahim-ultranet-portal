@@ -831,6 +831,10 @@ export default {
         const body = await readJson(request);
         const username = typeof body.mikrotik_username === "string" ? body.mikrotik_username.trim() : "";
         if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(username)) return fail("invalid_mikrotik_username", 400, cors);
+        const duplicate = await env.DB.prepare(
+          "SELECT id FROM customers WHERE mikrotik_username = ? AND id <> ? LIMIT 1",
+        ).bind(username, customerId).first();
+        if (duplicate) return fail("mikrotik_username_already_in_use", 409, cors);
         const results = await env.DB.batch([
           env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ? AND role = 'customer'").bind(username, customerId),
           env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'customer_mikrotik_username_set', 'customer_id=' || ? WHERE changes() = 1").bind(admin.id, customerId),
