@@ -197,7 +197,7 @@ export default {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
-    const allowOriginlessPublicRead = origin === null && request.method === "GET" && url.pathname === "/packages";
+    const allowOriginlessPublicRead = (origin === null || origin === "null") && request.method === "GET" && url.pathname === "/packages";
     if (origin !== ALLOWED_ORIGIN && !allowOriginlessPublicRead) return fail("origin_not_allowed", 403, cors);
     if (!["GET", "POST"].includes(request.method)) return fail("method_not_allowed", 405, cors);
 
