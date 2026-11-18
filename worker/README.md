@@ -45,6 +45,7 @@ Apply these files to the isolated staging D1 database in this exact order:
 8. `0008_router_agent_queue.sql` — adds authenticated router registration, durable provisioning jobs, and event history.
 9. `0009_package_router_lifecycle.sql` — binds purchased package records to the router that accepted activation and indexes expiries.
 10. `0010_unique_mikrotik_username.sql` — prevents multiple portal customers from sharing a RouterOS username.
+11. `0011_emergency_router_lifecycle.sql` — records the approving admin, router, and five-hour emergency session expiry.
 
 Take a D1 backup before applying migrations. Do not run these migrations against production as part of staging setup.
 
@@ -60,13 +61,13 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 ## Required verification before accepting real payments
 
 1. Confirm the staging Worker and D1 are separate from production; back up staging D1 before migrations.
-2. Apply migrations 0001–0010 in order to staging D1 only and verify every migration in the build log.
+2. Apply migrations 0001–0011 in order to staging D1 only and verify every migration in the build log.
 3. Call GET /health and verify the schema, indexes, and migration state.
 4. Configure ADMIN_SETUP_SECRET securely and perform the one-time admin bootstrap.
 5. Test customer registration/login/logout, session expiry, customer isolation, and Android Chrome cookie behavior.
 6. Test wallet reads, recharge submission, minimum ৳10 enforcement, duplicate Transaction ID rejection, admin approval/rejection, debt settlement, and exactly-once wallet credit.
 7. Test package catalogue separation, Hotspot and PPPoE package selection, wallet purchase idempotency, insufficient balance, and pending-order visibility.
-8. Test emergency eligibility, duplicate-request prevention, approval without debt, manual activation confirmation, exactly-once ৳20 debt creation, and repayment from later recharge.
+8. Test emergency eligibility, duplicate-request prevention, queued Hotspot activation, debt creation only after router acknowledgement, five-hour expiry, and repayment from later recharge.
 9. Test complaints, admin replies, password-reset privacy, password reset, and revocation of prior sessions.
 10. Review admin audit logs and error handling; run the full automated test suite against a disposable local database before staging.
 11. Enroll only a dedicated staging router; test token rotation, HTTPS polling, activation of an existing Hotspot user and PPP secret, failed-job retry, expiry queueing, and exact package status transitions.
@@ -74,7 +75,7 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 ## Not implemented — release blockers
 
 - Live MikroTik/RouterOS rollout and end-to-end validation for Hotspot and PPPoE. The outbound transport, package queue, and RouterOS template exist on a feature branch only.
-- Automatic 5-hour emergency Internet activation/expiry; emergency flow remains manually confirmed by an admin.
+- Live emergency RouterOS activation/expiry is wired into the queue, but it still needs staging and RouterOS lab validation.
 - Lab verification of RouterOS script execution, router profile prerequisites, acknowledgement retries, and package expiry.
 - Verified bKash/Nagad provider API or webhook reconciliation; payment approval is manual.
 - End-to-end Android Chrome verification of cross-site session cookies.
