@@ -38,7 +38,7 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 - Wrangler config: this directory's wrangler.toml
 - Cloudflare Builds branch: feature/secure-portal-backend
 - Cloudflare Builds root directory: worker
-- Deploy command: npx wrangler deploy
+- Deploy command (staging only): `npx wrangler d1 migrations apply mahim-ultranet-db-staging --remote && npx wrangler deploy`
 - Keep ADMIN_SETUP_SECRET encrypted as a Worker secret; never paste it into chat or portal code.
 
 ## Deployment and verification
