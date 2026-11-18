@@ -38,6 +38,7 @@ Apply these files to the isolated staging D1 database in this exact order:
 5. `0005_disable_emergency_catalogue_package.sql` — removes the emergency-only offer from the normal package catalogue.
 6. `0006_enforce_minimum_recharge.sql` — database-level guard rejects payment requests below ৳10.
 7. `0007_emergency_activation_confirmation.sql` — records admin confirmation before emergency debt is created.
+8. `0008_router_agent_queue.sql` — adds authenticated router registration, durable provisioning jobs, and event history.
 
 Take a D1 backup before applying migrations. Do not run these migrations against production as part of staging setup.
 
