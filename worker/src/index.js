@@ -373,6 +373,24 @@ export default {
           "SELECT id, price_taka, duration, duration_minutes, speed_mbps, service_type FROM packages WHERE id = ? AND is_active = 1 AND NOT (service_type = 'hotspot' AND duration_minutes = 300 AND duration = '৫ ঘণ্টা') LIMIT 1",
         ).bind(packageId).first();
         if (!pkg) return fail("package_not_available", 404, cors);
+        // Do not overlap a customer's access windows. The RouterOS executor disables
+        // an account at expiry, so a second package/emergency session on the same
+        // service could otherwise be cut off by the first session's expiry job.
+        const accessConflict = await env.DB.prepare(
+          `SELECT 1 AS conflict
+           FROM customer_packages
+           WHERE customer_id = ? AND service_type = ?
+             AND status IN ('pending', 'active', 'expiring')
+           UNION ALL
+           SELECT 1 AS conflict
+           FROM emergency_requests
+           WHERE customer_id = ? AND status IN ('pending', 'approved')
+             AND access_status IN ('pending', 'active', 'expiring')
+             AND ? = 'hotspot'
+           LIMIT 1`,
+        ).bind(customer.id, pkg.service_type, customer.id, pkg.service_type).first();
+        if (accessConflict) return fail("active_or_pending_access_exists", 409, cors);
+
         const reference = "pkg:" + customer.id + ":" + idempotencyKey;
         const existing = await env.DB.prepare(
           "SELECT id, type, amount_taka, status, reference, created_at FROM wallet_transactions WHERE customer_id = ? AND reference = ? LIMIT 1",
@@ -383,8 +401,8 @@ export default {
 
         const results = await env.DB.batch([
           env.DB.prepare(
-            "INSERT INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT ?, 'package_purchase', ?, 'success', ? WHERE EXISTS (SELECT 1 FROM wallets WHERE customer_id = ? AND balance_taka >= ?) AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)",
-          ).bind(customer.id, pkg.price_taka, reference, customer.id, pkg.price_taka, reference),
+            "INSERT INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT ?, 'package_purchase', ?, 'success', ? WHERE EXISTS (SELECT 1 FROM wallets WHERE customer_id = ? AND balance_taka >= ?) AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?) AND NOT EXISTS (SELECT 1 FROM customer_packages WHERE customer_id = ? AND service_type = ? AND status IN ('pending', 'active', 'expiring')) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status IN ('pending', 'approved') AND access_status IN ('pending', 'active', 'expiring') AND ? = 'hotspot')",
+          ).bind(customer.id, pkg.price_taka, reference, customer.id, pkg.price_taka, reference, customer.id, pkg.service_type, customer.id, pkg.service_type),
           env.DB.prepare(
             "UPDATE wallets SET balance_taka = balance_taka - ? WHERE customer_id = ? AND changes() = 1",
           ).bind(pkg.price_taka, customer.id),
@@ -394,9 +412,23 @@ export default {
         ]);
         const ledgerInserted = Number(results?.[0]?.meta?.changes || 0);
         if (ledgerInserted !== 1) {
-          const balance = await env.DB.prepare(
-            "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
-          ).bind(customer.id).first();
+          const [balance, latestConflict] = await Promise.all([
+            env.DB.prepare("SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1").bind(customer.id).first(),
+            env.DB.prepare(
+              `SELECT 1 AS conflict
+               FROM customer_packages
+               WHERE customer_id = ? AND service_type = ?
+                 AND status IN ('pending', 'active', 'expiring')
+               UNION ALL
+               SELECT 1 AS conflict
+               FROM emergency_requests
+               WHERE customer_id = ? AND status IN ('pending', 'approved')
+                 AND access_status IN ('pending', 'active', 'expiring')
+                 AND ? = 'hotspot'
+               LIMIT 1`,
+            ).bind(customer.id, pkg.service_type, customer.id, pkg.service_type).first(),
+          ]);
+          if (latestConflict) return fail("active_or_pending_access_exists", 409, cors);
           return fail(balance ? "insufficient_wallet_balance_or_duplicate_request" : "wallet_not_found", 409, cors);
         }
         const orderId = Number(results?.[2]?.meta?.last_row_id || 0);
@@ -530,8 +562,8 @@ export default {
         if (customer.role !== "customer") return fail("customer_account_required", 403, cors);
         if (!(await rateLimit(env.DB, request, "emergency-request", String(customer.id)))) return fail("too_many_attempts", 429, cors);
         const result = await env.DB.prepare(
-          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = ? AND (e2.status = 'pending' OR (e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))))",
-        ).bind(customer.id, customer.id, customer.id, customer.id, customer.id).run();
+          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = ? AND (e2.status = 'pending' OR (e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id)))) AND NOT EXISTS (SELECT 1 FROM customer_packages cp WHERE cp.customer_id = ? AND cp.service_type = 'hotspot' AND cp.status IN ('pending', 'active', 'expiring'))",
+        ).bind(customer.id, customer.id, customer.id, customer.id, customer.id, customer.id).run();
         if (Number(result.meta?.changes || 0) !== 1) return fail("not_eligible_or_existing_debt_or_pending_request", 409, cors);
         return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, duration_minutes: 300, duration_hours: 5, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
       }
