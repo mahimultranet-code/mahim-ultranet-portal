@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.js";
+import { encryptHotspotPassword } from "../src/router-agent.js";
 
 const PORTAL_ORIGIN = "https://mahimultranet-code.github.io";
 
@@ -174,4 +175,19 @@ test("admin cannot manually confirm emergency activation or create debt", async 
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, "router_confirmation_required");
   assert.equal(batchCalled, false);
+});
+
+
+test("Hotspot credentials are encrypted with a 32-byte AES-GCM key", async () => {
+  const key = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+  const base64url = btoa(String.fromCharCode(...key)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  const cleartext = "WiFi-secret-2026!";
+  const encrypted = await encryptHotspotPassword({ HOTSPOT_CREDENTIAL_ENCRYPTION_KEY: base64url }, cleartext);
+  assert.match(encrypted.ciphertext, /^[A-Za-z0-9_-]+$/);
+  assert.match(encrypted.iv, /^[A-Za-z0-9_-]{16}$/);
+  assert.equal(encrypted.ciphertext.includes(cleartext), false);
+  await assert.rejects(
+    encryptHotspotPassword({ HOTSPOT_CREDENTIAL_ENCRYPTION_KEY: "not-a-32-byte-key" }, cleartext),
+    /credential_encryption_key_invalid/,
+  );
 });
