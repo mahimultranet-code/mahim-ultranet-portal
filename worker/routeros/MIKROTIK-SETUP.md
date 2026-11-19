@@ -31,7 +31,7 @@ Download both backup files off the router. Verify the export is readable. Do not
 Choose a unique router key (example: `mahim-hapac2-main`). Replace `YOUR_ENROLLMENT_SECRET` locally; do not send it in chat or commit it.
 
 ```routeros
-/tool fetch url="https://mahim-ultranet-api-v2-staging.mahimultranet.workers.dev/router/enroll" http-method=post http-header-field="X-Router-Enroll-Secret: YOUR_ENROLLMENT_SECRET,Content-Type: application/json" http-data="{\"router_key\":\"mahim-hapac2-main\",\"router_name\":\"Mahim UltraNet hAP ac2\",\"routeros_version\":\"7.24\"}" check-certificate=yes output=user
+/tool fetch url="https://mahim-ultranet-api-v2-staging.mahimultranet.workers.dev/router/enroll" http-method=post http-header-field={"X-Router-Enroll-Secret: YOUR_ENROLLMENT_SECRET";"Content-Type: application/json"} http-data="{\"router_key\":\"mahim-hapac2-main\",\"router_name\":\"Mahim UltraNet hAP ac2\",\"routeros_version\":\"7.24\"}" check-certificate=yes output=user
 ```
 
 The response includes `router_token`. Copy it privately once. It is only returned at enrollment and cannot be recovered later; re-enrollment rotates it. If the command errors, stop and inspect the error; do not repeatedly enroll.
@@ -42,8 +42,7 @@ The response includes `router_token`. Copy it privately once. It is only returne
 2. Set `ultranetApiBase` to the staging URL shown in the script.
 3. Upload the edited file to **Files** in WinBox.
 4. Import it once from Terminal: `/import file-name=mahim-ultranet-agent-v7.rsc`.
-5. Inspect logs and run one manual test before adding a scheduler:
-   `/system script run MahimUltraNetAgent` (if the import created the script under that name; otherwise create a script named exactly `MahimUltraNetAgent` from the file contents in System → Scripts).
+5. The import creates a script named `MahimUltraNetAgent`. Inspect it in System → Scripts, then run one manual test: `/system script run MahimUltraNetAgent`.
 6. Verify the Worker records `last_seen_at` and an empty poll returns `job: null`. Do not test account creation on a live customer.
 
 ## Step 4 — enable recurring polling only after manual test
