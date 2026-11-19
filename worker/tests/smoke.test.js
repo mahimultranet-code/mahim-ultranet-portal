@@ -67,3 +67,71 @@ test("authenticated API routes reject an untrusted browser origin", async () => 
   assert.equal(response.status, 403);
   assert.equal((await response.json()).error, "origin_not_allowed");
 });
+
+
+function routerDb({ enrollmentAttempts = 1, router = null } = {}) {
+  return {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            first: async () => {
+              if (sql.includes("SELECT attempts FROM rate_limits")) return { attempts: enrollmentAttempts };
+              if (sql.includes("SELECT id, router_key FROM routers")) return router;
+              return null;
+            },
+            run: async () => ({ meta: { changes: 1 } }),
+          };
+        },
+      };
+    },
+  };
+}
+
+test("router poll requires a valid enrolled router token", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/router/poll", { method: "GET" }),
+    { DB: routerDb() },
+  );
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "unauthorized");
+});
+
+test("router job acknowledgement requires a valid enrolled router token", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/router/jobs/123/ack", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "applied" }),
+    }),
+    { DB: routerDb() },
+  );
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "unauthorized");
+});
+
+test("router enrollment fails closed when its secret is not configured", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/router/enroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "CF-Connecting-IP": "192.0.2.10" },
+      body: JSON.stringify({ router_key: "lab-router-01", router_name: "Lab Router" }),
+    }),
+    { DB: routerDb(), ROUTER_ENROLLMENT_SECRET: "" },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "router_enrollment_unavailable");
+});
+
+test("router enrollment rate limit blocks excessive attempts", async () => {
+  const response = await worker.fetch(
+    new Request("https://staging.example/router/enroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "CF-Connecting-IP": "192.0.2.11" },
+      body: JSON.stringify({ router_key: "lab-router-01", router_name: "Lab Router" }),
+    }),
+    { DB: routerDb({ enrollmentAttempts: 6 }), ROUTER_ENROLLMENT_SECRET: "x".repeat(40) },
+  );
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error, "too_many_attempts");
+});
