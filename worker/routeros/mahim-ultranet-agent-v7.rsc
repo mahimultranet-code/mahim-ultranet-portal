@@ -81,6 +81,6 @@
     :log error ("Mahim UltraNet job " . $jobId . " failed: " . $jobError);
 }
 
-/tool fetch url=($ultranetApiBase . "/router/jobs/" . $jobId . "/ack") http-method=post http-header-field=("Authorization: Bearer " . $ultranetRouterToken . ",Content-Type: application/json") http-data=("{\"status\":\"" . $resultStatus . "\",\"details\":{\"message\":\"" . $resultMessage . "\"}}") check-certificate=yes output=user;
+/tool fetch url=($ultranetApiBase . "/router/jobs/" . $jobId . "/ack") http-method=post http-header-field={"Authorization: Bearer " . $ultranetRouterToken;"Content-Type: application/json"} http-data=("{\"status\":\"" . $resultStatus . "\",\"details\":{\"message\":\"" . $resultMessage . "\"}}") check-certificate=yes output=user;
 
 }
