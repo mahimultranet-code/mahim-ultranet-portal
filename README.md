@@ -29,7 +29,7 @@ The portal supports customer registration/login, wallet and transaction history,
 
 ## Captive Portal and Android app
 
-- `hotspot/login.html` is the RouterOS Hotspot login-page template. Copy it into the router's Hotspot HTML directory only after testing on a lab router; it expects RouterOS's standard `md5.js` file for CHAP login.
+- `hotspot/login.html` is the RouterOS Hotspot login-page template. Copy it into the router's Hotspot HTML directory only after testing on a lab router; it expects RouterOS's standard `md5.js` file for CHAP login. The signup flow separately provisions the new RouterOS Hotspot credential through the encrypted router-agent queue.
 - The captive page links to the existing customer portal for both sign-up and sign-in. Portal credentials are not RouterOS Hotspot credentials. A newly registered portal account does not yet create a Hotspot user or grant Internet access; secure customer-to-router credential provisioning and mapping still require implementation and lab validation.
 - Add only the exact portal hostname to Hotspot Walled Garden for unauthenticated sign-up/login access. Do not allow all destinations. Test captive assistant behavior and HTTPS on Android/iOS.
 - `android/` contains a minimal Android WebView wrapper. GitHub Actions builds an installable debug APK artifact. A version tag such as `android-v1.0.0` publishes the APK to GitHub Releases. The first build is debug-signed; production signing needs a private keystore and protected CI secrets.
