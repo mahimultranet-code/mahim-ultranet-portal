@@ -63,7 +63,7 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 ## Required verification before accepting real payments
 
 1. Confirm the staging Worker and D1 are separate from production; back up staging D1 before migrations.
-2. Apply migrations 0001–0011 in order to staging D1 only and verify every migration in the build log.
+2. Apply migrations 0001–0012 in order to staging D1 only and verify every migration in the build log.
 3. Call GET /health and verify the schema, indexes, and migration state.
 4. Configure ADMIN_SETUP_SECRET securely and perform the one-time admin bootstrap.
 5. Test customer registration/login/logout, session expiry, customer isolation, and Android Chrome cookie behavior.
@@ -97,3 +97,8 @@ Do not advertise automatic Internet activation or accept real customer payments 
 - Never expose RouterOS management ports or credentials to the public internet.
 
 All work remains on feature branches until review and end-to-end staging tests are complete. Do not merge or deploy without explicit approval.
+
+
+## Captive Portal signup provisioning
+
+New Hotspot signup requires a separate Wi-Fi password. The Worker encrypts it using AES-256-GCM and queues a create-user job for an enrolled RouterOS agent. Set `HOTSPOT_CREDENTIAL_ENCRYPTION_KEY` as a base64url-encoded 32-byte secret in the staging Worker. The password is decrypted only for the authenticated router poll response and erased from D1 after successful RouterOS acknowledgement. Apply migration `0012_hotspot_provisioning.sql` before testing. This is not live-ready until tested on a lab router.
