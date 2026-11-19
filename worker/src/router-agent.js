@@ -312,7 +312,7 @@ export async function handleRouterAgent(request, env, url) {
          WHERE id = ? AND router_id = ? AND status = 'leased'`,
       ).bind(storedStatus, details, retry ? null : new Date().toISOString(), jobId, router.id).run();
       if (Number(result.meta?.changes || 0) !== 1) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
-      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type)) {
+      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type) && jobPayload.create_user !== true) {
         await env.DB.prepare(
           `UPDATE customer_packages
            SET status = 'active',
