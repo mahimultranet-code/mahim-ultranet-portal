@@ -180,7 +180,7 @@ test("admin cannot manually confirm emergency activation or create debt", async 
 
 test("Hotspot credentials are encrypted with a 32-byte AES-GCM key", async () => {
   const key = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
-  const base64url = btoa(String.fromCharCode(...key)).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  const base64url = btoa(String.fromCharCode(...key)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
   const cleartext = "WiFi-secret-2026!";
   const encrypted = await encryptHotspotPassword({ HOTSPOT_CREDENTIAL_ENCRYPTION_KEY: base64url }, cleartext);
   assert.match(encrypted.ciphertext, /^[A-Za-z0-9_-]+$/);
