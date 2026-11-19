@@ -272,7 +272,7 @@ export async function handleRouterAgent(request, env, url) {
       if (!leasedJob) return response({ ok: false, error: "job_not_leased_or_not_found" }, 409);
       let jobPayload;
       try { jobPayload = JSON.parse(leasedJob.payload_json); } catch { return response({ ok: false, error: "invalid_job_payload" }, 500); }
-      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type)) {
+      if (status === "applied" && ["activate_hotspot", "activate_pppoe"].includes(leasedJob.job_type) && jobPayload.create_user !== true) {
         if (!Number.isSafeInteger(Number(jobPayload.customer_package_id)) ||
             !Number.isSafeInteger(Number(jobPayload.duration_minutes)) ||
             Number(jobPayload.duration_minutes) < 1 ||
