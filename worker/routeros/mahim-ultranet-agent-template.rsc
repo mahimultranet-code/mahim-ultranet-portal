@@ -34,8 +34,23 @@
         :if ($serviceType != "hotspot" || $profile != "Mahim-Hotspot-5M") do={ :error "Unexpected Hotspot profile"; }
         :if ([:len [/ip hotspot user profile find where name=$profile]] = 0) do={ :error "Hotspot profile missing"; }
         :local userIds [/ip hotspot user find where name=$username];
-        :if ([:len $userIds] = 0) do={ :error "Existing Hotspot user missing"; }
-        /ip hotspot user set ($userIds->0) profile=$profile disabled=no;
+        :if (($jobType = "activate_hotspot") && ($payload->"create_user" = true)) do={
+            :local provisioningId ($payload->"provisioning_id");
+            :local hotspotPassword ($payload->"password");
+            :if ([:typeof $provisioningId] = "nil" || [:typeof $hotspotPassword] = "nil") do={ :error "Provisioning credentials missing"; }
+            :if ([:len $hotspotPassword] < 10 || [:len $hotspotPassword] > 64) do={ :error "Invalid Hotspot password length"; }
+            :local provisionComment ("Mahim UltraNet customer " . $provisioningId);
+            :if ([:len $userIds] = 0) do={
+                /ip hotspot user add name=$username password=$hotspotPassword profile=$profile disabled=no comment=$provisionComment;
+            } else={
+                :local existingComment [/ip hotspot user get ($userIds->0) comment];
+                :if ($existingComment != $provisionComment) do={ :error "Hotspot username already belongs to another record"; }
+                /ip hotspot user set ($userIds->0) profile=$profile disabled=no;
+            }
+        } else={
+            :if ([:len $userIds] = 0) do={ :error "Existing Hotspot user missing"; }
+            /ip hotspot user set ($userIds->0) profile=$profile disabled=no;
+        }
     } else={
         :if ($jobType = "activate_pppoe") do={
             :if ($serviceType != "pppoe" || $profile != "Mahim-PPPoE-10M") do={ :error "Unexpected PPPoE profile"; }
