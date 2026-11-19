@@ -50,6 +50,9 @@ function decode64(value) {
 
 async function credentialKey(env) {
   if (typeof env.HOTSPOT_CREDENTIAL_ENCRYPTION_KEY !== "string") throw new Error("credential_encryption_key_missing");
+  if (!/^[A-Za-z0-9_-]{43}$/.test(env.HOTSPOT_CREDENTIAL_ENCRYPTION_KEY)) {
+    throw new Error("credential_encryption_key_invalid");
+  }
   const raw = decode64(env.HOTSPOT_CREDENTIAL_ENCRYPTION_KEY);
   if (raw.length !== 32) throw new Error("credential_encryption_key_invalid");
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
