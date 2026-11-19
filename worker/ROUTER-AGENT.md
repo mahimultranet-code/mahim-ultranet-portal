@@ -10,9 +10,19 @@ This is the first backend layer for RouterOS integration. The router makes outbo
 
 Tokens are stored as SHA-256 hashes. Poll and acknowledgement require TLS plus the per-router bearer token. The enrollment secret and router token must never be committed to Git.
 
+## First-time Hotspot signup provisioning
+
+- New customer signup requires a separate Hotspot password (10–64 characters); the portal login password remains separate.
+- The RouterOS username is set to the customer's mobile number. If that username is already mapped, the system uses a unique `mu<customer-id>` fallback and returns it in the customer profile.
+- Hotspot passwords are encrypted with AES-256-GCM before being stored in D1. Configure Worker secret `HOTSPOT_CREDENTIAL_ENCRYPTION_KEY` as base64url for exactly 32 random bytes. Never place the key in Git or send it to the browser.
+- When a router is enrolled, a `create_user` provisioning payload is queued. The Worker decrypts the password only for the authenticated router's HTTPS poll response. The RouterOS agent creates the user with the approved `Mahim-Hotspot-5M` profile and a customer-specific ownership comment.
+- Provisioning is idempotent: a retry only reuses an existing username when its ownership comment matches the same portal customer. A conflicting existing username fails closed.
+- After a successful RouterOS ACK, D1 marks the Hotspot account active and clears the encrypted password and IV. A failed job never grants access.
+- If no router is enrolled, provisioning remains pending and is queued after a router enrolls. If the profile is missing or a username conflicts, an administrator must resolve the issue; no existing user is overwritten.
+
 ## Safety and current limits
 
-This commit creates the authenticated transport and durable job queue only. It does not yet create or execute customer provisioning jobs. The RouterOS script, least-privilege router permissions, package-to-job mapping, job idempotency, and end-to-end staging tests are still required. Do not deploy or enroll a live router until those pieces are completed and reviewed. Keep RouterOS API and API-SSL inaccessible from WAN; this design does not need them exposed.
+The router makes outbound HTTPS requests only. Do not expose RouterOS API/8728 or API-SSL/8729 to the Internet. Keep the enrollment secret, router bearer token, and credential-encryption key private. Do not install the template on the live hAP ac² before a dedicated lab test and a verified backup.
 
 ## Package lifecycle wiring
 
@@ -22,11 +32,11 @@ This commit creates the authenticated transport and durable job queue only. It d
 - Worker Cron runs every minute and queues a disable job after `expires_at`; successful router acknowledgement marks the package expired.
 - Emergency approval queues a five-hour Hotspot activation when a router and existing username are mapped. Only a successful router acknowledgement records the confirmation and creates the ৳20 debt.
 - The one-minute Worker Cron queues an emergency expiry job after five hours; successful acknowledgement marks the emergency access expired.
-- The RouterOS template only enables/disables existing Hotspot users or PPP secrets. It never creates accounts or sets/reuses passwords.
+- The RouterOS template can create a new Hotspot user only for an authenticated encrypted provisioning job, and can enable/disable existing Hotspot users or PPP secrets for package lifecycle jobs.
 
 ## RouterOS template
 
-See `routeros/mahim-ultranet-agent-template.rsc`. Replace the staging Worker URL and one-time router token only after staging deployment/enrollment. It uses RouterOS JSON deserialization and HTTPS fetch. Test against a dedicated lab user first. The template intentionally does not create missing users, and a missing user/profile is reported as a failed job.
+See `routeros/mahim-ultranet-agent-template.rsc` (repository path: `worker/routeros/mahim-ultranet-agent-template.rsc`). Replace the staging Worker URL and one-time router token only after staging deployment/enrollment. It uses RouterOS JSON deserialization and HTTPS fetch. Test against a dedicated lab user first. The template intentionally does not create missing users, and a missing user/profile is reported as a failed job.
 
 ## Not ready for live customer traffic
 
