@@ -1,7 +1,7 @@
-# Mahim UltraNet RouterOS v7 outbound agent - recurring worker script
-# Configure the API URL and router token before importing. Run only after staging setup and lab backup.
-# Router initiates HTTPS; never expose API/8728 or API-SSL/8729 to the Internet.
-
+# Mahim UltraNet RouterOS v7 agent installer.
+# Edit the router token locally before importing. Do not commit real secrets.
+:if ([:len [/system script find where name="MahimUltraNetAgent"]] > 0) do={ :error "MahimUltraNetAgent already exists; inspect it before replacing"; }
+/system script add name=MahimUltraNetAgent policy=read,write,test,ftp source={
 :global ultranetApiBase "https://mahim-ultranet-api-v2-staging.mahimultranet.workers.dev";
 :global ultranetRouterToken "REPLACE-WITH-ONE-TIME-ROUTER-TOKEN";
 
@@ -83,6 +83,4 @@
 
 /tool fetch url=($ultranetApiBase . "/router/jobs/" . $jobId . "/ack") http-method=post http-header-field=("Authorization: Bearer " . $ultranetRouterToken . ",Content-Type: application/json") http-data=("{\"status\":\"" . $resultStatus . "\",\"details\":{\"message\":\"" . $resultMessage . "\"}}") check-certificate=yes output=user;
 
-
-# Add a scheduler separately after a successful manual test:
-# /system scheduler add name=MahimUltraNetAgent start-time=startup interval=30s on-event="/system script run MahimUltraNetAgent" policy=read,write,test,ftp
+}
