@@ -10,7 +10,7 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Secure, HttpOnly session cookies; exact-origin CORS for the GitHub Pages portal.
 - Authenticated wallet balance and customer-scoped transaction history.
 - Public active package catalogue and authenticated package purchase using server-side pricing, an idempotency key, and a guarded wallet debit.
-- Package purchase creates a pending customer order. It does not activate a RouterOS service or start an expiry timer.
+- Package purchase creates a pending customer order. When an enrolled router and mapped existing username are available, it queues activation; router acknowledgement activates the service and starts its expiry timer.
 - bKash/Nagad payment request submission and customer payment history. Requests stay pending until an admin manually verifies and approves them. There is no verified payment-provider callback integration.
 - One-time admin bootstrap protected by the ADMIN_SETUP_SECRET Worker secret.
 - Admin dashboard, customer directory/search, payment queue with approve/reject, complaint queue/replies, package catalogue create/update/enable/disable, and read-only package-order queue.
