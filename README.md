@@ -23,8 +23,8 @@ The portal supports customer registration/login, wallet and transaction history,
 - Worker: `mahim-ultranet-api-v2-staging`
 - D1: `mahim-ultranet-db-staging`, binding `DB`
 - Wrangler config: `worker/wrangler.toml`
-- Apply migrations `0001_initial.sql` through `0011_emergency_router_lifecycle.sql` in order to the isolated staging D1 only, after taking a backup.
-- Keep `ADMIN_SETUP_SECRET` and `ROUTER_ENROLLMENT_SECRET` encrypted as Worker secrets. Never commit or paste secrets or MikroTik credentials into chat or portal code.
+- Apply migrations `0001_initial.sql` through `0012_hotspot_provisioning.sql` in order to the isolated staging D1 only, after taking a backup.
+- Keep `ADMIN_SETUP_SECRET`, `ROUTER_ENROLLMENT_SECRET`, and `HOTSPOT_CREDENTIAL_ENCRYPTION_KEY` encrypted as Worker secrets. Never commit or paste secrets or MikroTik credentials into chat or portal code.
 - The current GitHub Pages and workers.dev origins are cross-site. Android Chrome session-cookie behavior must be verified; a same-site custom API domain may be required.
 
 ## Captive Portal and Android app
@@ -37,9 +37,8 @@ The portal supports customer registration/login, wallet and transaction history,
 
 ## MikroTik / RouterOS integration status
 
-- The feature branch contains an authenticated outbound router job API, durable provisioning queue, expiry queueing, and a RouterOS v7 single-run executor template.
-- The template only modifies existing Hotspot users and PPP secrets; it does not create customer credentials.
-- The template does not enroll a router or install a recurring Scheduler. A least-privilege recurring polling Scheduler and enrollment procedure still require lab validation.
+- The feature branch contains an authenticated outbound router job API, durable provisioning queue, expiry queueing, encrypted first-time Hotspot provisioning, a RouterOS v7 agent installer, and a staging enrollment guide.
+- `worker/routeros/mahim-ultranet-agent-v7.rsc` imports the named polling script; the guide provides one-time enrollment and an optional 30-second scheduler command. These steps still require lab-router validation.
 - Do not import or run the template on the live router until staging API/D1 tests, RouterOS syntax and policy validation, profile prerequisites, retry/expiry behavior, and end-to-end tests on a dedicated staging router are complete.
 - Never expose RouterOS management ports (8728/8729) to the public Internet.
 
