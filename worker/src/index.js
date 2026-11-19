@@ -1,4 +1,4 @@
-import { handleRouterAgent } from "./router-agent.js";
+import { handleRouterAgent, encryptHotspotPassword, queuePendingHotspotProvisioning } from "./router-agent.js";
 const SERVICE = "mahim-ultranet-api-v2-staging";
 const ALLOWED_ORIGIN = "https://mahimultranet-code.github.io";
 const SESSION_COOKIE = "__Host-ultranet_session";
@@ -273,6 +273,8 @@ export default {
         const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
         const password = typeof body.password === "string" ? body.password : "";
         const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
+        const hotspotPassword = typeof body.hotspot_password === "string" ? body.hotspot_password : "";
+        const confirmHotspotPassword = typeof body.confirmHotspotPassword === "string" ? body.confirmHotspotPassword : "";
 
         if (name.length < 2 || name.length > 80) return fail("invalid_name", 400, cors);
         if (!/^01[3-9]\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
@@ -281,8 +283,16 @@ export default {
         }
         if (password.length < 10 || password.length > 128) return fail("weak_password", 400, cors);
         if (password !== confirmPassword) return fail("password_mismatch", 400, cors);
+        if (hotspotPassword.length < 10 || hotspotPassword.length > 64) return fail("invalid_hotspot_password", 400, cors);
+        if (hotspotPassword !== confirmHotspotPassword) return fail("hotspot_password_mismatch", 400, cors);
         if (!(await rateLimit(env.DB, request, "register", mobile))) return fail("too_many_attempts", 429, cors);
 
+        let encryptedHotspotPassword;
+        try {
+          encryptedHotspotPassword = await encryptHotspotPassword(env, hotspotPassword);
+        } catch {
+          return fail("hotspot_provisioning_unavailable", 503, cors);
+        }
         const passwordHash = await hashPassword(password);
         let customer;
         try {
@@ -298,17 +308,35 @@ export default {
         if (!Number.isSafeInteger(customerId) || customerId < 1) {
           return fail("registration_unavailable", 500, cors);
         }
+        let mikrotikUsername = mobile;
         try {
-          await env.DB.prepare("INSERT INTO wallets (customer_id, balance_taka) VALUES (?, 0)").bind(customerId).run();
+          await env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ?").bind(mikrotikUsername, customerId).run();
+        } catch {
+          mikrotikUsername = "mu" + customerId;
+          await env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ?").bind(mikrotikUsername, customerId).run();
+        }
+        try {
+          await env.DB.batch([
+            env.DB.prepare("INSERT INTO wallets (customer_id, balance_taka) VALUES (?, 0)").bind(customerId),
+            env.DB.prepare(
+              "INSERT INTO hotspot_provisioning (customer_id, mikrotik_username, password_ciphertext, password_iv, status) VALUES (?, ?, ?, ?, 'pending')",
+            ).bind(customerId, mikrotikUsername, encryptedHotspotPassword.ciphertext, encryptedHotspotPassword.iv),
+          ]);
         } catch {
           await env.DB.prepare("DELETE FROM customers WHERE id = ?").bind(customerId).run();
           return fail("registration_unavailable", 500, cors);
+        }
+        let hotspotProvisioningStatus = "pending_router_enrollment";
+        const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+        if (router) {
+          const queued = await queuePendingHotspotProvisioning(env.DB, router.id, customerId);
+          if (queued === 1) hotspotProvisioningStatus = "queued_for_router";
         }
         const token = await createSession(env.DB, customerId);
         const row = await env.DB.prepare(
           "SELECT id, name, mobile, email, role, is_verified, mikrotik_username FROM customers WHERE id = ?",
         ).bind(customerId).first();
-        return json({ ok: true, customer: publicCustomer(row) }, 201, {
+        return json({ ok: true, customer: publicCustomer(row), hotspot_provisioning_status: hotspotProvisioningStatus }, 201, {
           ...cors,
           "set-cookie": sessionCookie(token),
         });
