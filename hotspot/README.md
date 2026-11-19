@@ -6,7 +6,7 @@ This folder contains a login-page template. It is not installed on the live hAP 
 
 - The captive page supports existing RouterOS Hotspot username/password authentication using the standard RouterOS `md5.js` CHAP helper.
 - The sign-up/sign-in link opens the existing Mahim UltraNet customer portal.
-- Portal account credentials are not RouterOS Hotspot credentials. Registering or logging in to the portal does not create a Hotspot user, change a Hotspot password, or grant Internet access.
+- Portal account credentials are separate from RouterOS Hotspot credentials. New signup collects a separate Hotspot password, stores it encrypted in D1, and queues RouterOS user creation after the Worker encryption secret and router enrollment are configured. RouterOS ACK is required before provisioning is marked active.
 - Do not expose RouterOS API ports 8728/8729 to the WAN.
 - Do not copy this template to the live router until it has been tested with a backup and a dedicated lab Hotspot user.
 
@@ -36,4 +36,4 @@ Do not allow `github.com`, all of `github.io`, all of `workers.dev`, or arbitrar
 
 ## Still required for true first-time Wi-Fi onboarding
 
-A secure account-to-RouterOS provisioning flow is not yet implemented. It needs a deliberate credential lifecycle, RouterOS user creation job, idempotent acknowledgements, and physical-router tests. Until that is delivered, a newly registered portal customer must be linked to a valid RouterOS Hotspot user by an administrator before Internet access can be activated.
+The secure account-to-RouterOS provisioning flow is implemented in the feature branch, including encrypted credential storage, RouterOS user creation, idempotent ownership checks, and ACK-based completion. It still requires the `HOTSPOT_CREDENTIAL_ENCRYPTION_KEY` Worker secret, migration 0012, a configured/enrolled lab router, and physical-router tests before live customer use.
