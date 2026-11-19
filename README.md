@@ -48,7 +48,7 @@ The portal supports customer registration/login, wallet and transaction history,
 Before accepting real customer payments or advertising automatic Internet activation:
 
 1. Verify the staging Worker and D1 are isolated from production; back up staging D1.
-2. Apply migrations 0001–0011 to staging D1 and verify schema/migration state.
+2. Apply migrations 0001–0012 to staging D1 and verify schema/migration state.
 3. Verify `GET /health`, admin bootstrap, customer sessions, customer data isolation, and Android Chrome cookie behavior.
 4. Test wallet recharge minimum, duplicate transaction handling, admin approval/rejection, exactly-once wallet credit, and debt settlement.
 5. Test Hotspot/PPPoE package catalogue, wallet purchase idempotency, pending orders, activation acknowledgement, and expiry.
