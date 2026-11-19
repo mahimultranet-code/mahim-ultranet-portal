@@ -27,6 +27,14 @@ The portal supports customer registration/login, wallet and transaction history,
 - Keep `ADMIN_SETUP_SECRET` and `ROUTER_ENROLLMENT_SECRET` encrypted as Worker secrets. Never commit or paste secrets or MikroTik credentials into chat or portal code.
 - The current GitHub Pages and workers.dev origins are cross-site. Android Chrome session-cookie behavior must be verified; a same-site custom API domain may be required.
 
+## Captive Portal and Android app
+
+- `hotspot/login.html` is the RouterOS Hotspot login-page template. Copy it into the router's Hotspot HTML directory only after testing on a lab router; it expects RouterOS's standard `md5.js` file for CHAP login.
+- The captive page links to the existing customer portal for both sign-up and sign-in. Portal credentials are not RouterOS Hotspot credentials. A newly registered portal account does not yet create a Hotspot user or grant Internet access; secure customer-to-router credential provisioning and mapping still require implementation and lab validation.
+- Add only the exact portal hostname to Hotspot Walled Garden for unauthenticated sign-up/login access. Do not allow all destinations. Test captive assistant behavior and HTTPS on Android/iOS.
+- `android/` contains a minimal Android WebView wrapper. GitHub Actions builds an installable debug APK artifact. A version tag such as `android-v1.0.0` publishes the APK to GitHub Releases. The first build is debug-signed; production signing needs a private keystore and protected CI secrets.
+- The portal's Android APK button opens the Releases page. No APK is claimed available until the Android build workflow has succeeded and a release has been published.
+
 ## MikroTik / RouterOS integration status
 
 - The feature branch contains an authenticated outbound router job API, durable provisioning queue, expiry queueing, and a RouterOS v7 single-run executor template.
