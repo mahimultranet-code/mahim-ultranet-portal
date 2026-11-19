@@ -135,3 +135,43 @@ test("router enrollment rate limit blocks excessive attempts", async () => {
   assert.equal(response.status, 429);
   assert.equal((await response.json()).error, "too_many_attempts");
 });
+
+
+test("admin cannot manually confirm emergency activation or create debt", async () => {
+  let batchCalled = false;
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            first: async () => {
+              if (sql.includes("FROM sessions s JOIN customers c")) {
+                return { id: 7, name: "Admin", mobile: "01900000000", role: "admin", is_verified: 1 };
+              }
+              return null;
+            },
+          };
+        },
+      };
+    },
+    batch() {
+      batchCalled = true;
+      throw new Error("manual activation must not write to the database");
+    },
+  };
+  const response = await worker.fetch(
+    new Request("https://staging.example/admin/emergency/42/activated", {
+      method: "POST",
+      headers: {
+        Origin: PORTAL_ORIGIN,
+        Cookie: "__Host-ultranet_session=test-session-token",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    }),
+    { DB: db },
+  );
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).error, "router_confirmation_required");
+  assert.equal(batchCalled, false);
+});
