@@ -36,6 +36,66 @@ async function readBody(request) {
   return JSON.parse(text);
 }
 
+function encode64(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+}
+
+function decode64(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function credentialKey(env) {
+  if (typeof env.HOTSPOT_CREDENTIAL_ENCRYPTION_KEY !== "string") throw new Error("credential_encryption_key_missing");
+  const raw = decode64(env.HOTSPOT_CREDENTIAL_ENCRYPTION_KEY);
+  if (raw.length !== 32) throw new Error("credential_encryption_key_invalid");
+  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+export async function encryptHotspotPassword(env, password) {
+  const key = await credentialKey(env);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(password));
+  return { ciphertext: encode64(new Uint8Array(encrypted)), iv: encode64(iv) };
+}
+
+async function decryptHotspotPassword(env, ciphertext, iv) {
+  const key = await credentialKey(env);
+  const clear = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode64(iv) }, key, decode64(ciphertext));
+  return new TextDecoder().decode(clear);
+}
+
+export async function queuePendingHotspotProvisioning(db, routerId, customerId = null) {
+  const rows = await db.prepare(
+    `SELECT customer_id, mikrotik_username FROM hotspot_provisioning
+     WHERE status = 'pending' AND (? IS NULL OR customer_id = ?)
+     ORDER BY customer_id ASC LIMIT 100`,
+  ).bind(customerId, customerId).all();
+  let queued = 0;
+  for (const row of rows.results || []) {
+    const payload = JSON.stringify({
+      provisioning_id: Number(row.customer_id),
+      username: row.mikrotik_username,
+      service_type: "hotspot",
+      profile: "Mahim-Hotspot-5M",
+      create_user: true,
+    });
+    const result = await db.prepare(
+      "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'activate_hotspot', ?, ?)",
+    ).bind(routerId, payload, "provision:hotspot:" + row.customer_id).run();
+    if (Number(result.meta?.changes || 0) === 1) {
+      await db.prepare(
+        "UPDATE hotspot_provisioning SET status = 'queued', router_id = ?, updated_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND status = 'pending'",
+      ).bind(routerId, row.customer_id).run();
+      queued++;
+    }
+  }
+  return queued;
+}
+
 
 async function enrollmentRateLimit(db, request) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -96,6 +156,7 @@ export async function handleRouterAgent(request, env, url) {
       const enrolled = await env.DB.prepare("SELECT id FROM routers WHERE router_key = ? LIMIT 1").bind(routerKey).first();
       let queuedOrders = 0;
       if (enrolled) {
+        queuedOrders += await queuePendingHotspotProvisioning(env.DB, enrolled.id);
         const pending = await env.DB.prepare(
           `SELECT cp.id, cp.service_type, cp.speed_mbps, p.duration_minutes, c.mikrotik_username
            FROM customer_packages cp
@@ -174,13 +235,21 @@ export async function handleRouterAgent(request, env, url) {
          RETURNING id, job_type, payload_json, idempotency_key, attempts`,
       ).bind(router.id).first();
       if (!job) return response({ ok: true, job: null, server_time: now });
+      const payload = JSON.parse(job.payload_json);
+      if (payload.create_user === true) {
+        const credential = await env.DB.prepare(
+          "SELECT password_ciphertext, password_iv FROM hotspot_provisioning WHERE customer_id = ? AND router_id = ? AND status = 'queued' LIMIT 1",
+        ).bind(Number(payload.provisioning_id), router.id).first();
+        if (!credential) return response({ ok: false, error: "hotspot_provisioning_credential_missing" }, 409);
+        payload.password = await decryptHotspotPassword(env, credential.password_ciphertext, credential.password_iv);
+      }
       return response({
         ok: true,
         server_time: now,
         job: {
           id: Number(job.id),
           type: job.job_type,
-          payload: JSON.parse(job.payload_json),
+          payload,
           idempotency_key: job.idempotency_key,
           attempt: Number(job.attempts),
         },
@@ -209,6 +278,13 @@ export async function handleRouterAgent(request, env, url) {
             Number(jobPayload.duration_minutes) < 1 ||
             !["hotspot", "pppoe"].includes(jobPayload.service_type)) {
           return response({ ok: false, error: "invalid_activation_job_payload" }, 422);
+        }
+      }
+      if (status === "applied" && jobPayload.create_user === true) {
+        if (!Number.isSafeInteger(Number(jobPayload.provisioning_id)) ||
+            jobPayload.service_type !== "hotspot" ||
+            jobPayload.profile !== "Mahim-Hotspot-5M") {
+          return response({ ok: false, error: "invalid_hotspot_provisioning_payload" }, 422);
         }
       }
       if (status === "applied" && leasedJob.job_type === "emergency_activate") {
@@ -244,6 +320,10 @@ export async function handleRouterAgent(request, env, url) {
                expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || ? || ' minutes')
            WHERE id = ? AND status = 'pending' AND router_id = ?`,
         ).bind(Number(jobPayload.duration_minutes), Number(jobPayload.customer_package_id), router.id).run();
+      } else if (status === "applied" && jobPayload.create_user === true) {
+        await env.DB.prepare(
+          "UPDATE hotspot_provisioning SET status = 'active', password_ciphertext = '', password_iv = '', updated_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND router_id = ? AND status = 'queued'",
+        ).bind(Number(jobPayload.provisioning_id), router.id).run();
       } else if (status === "applied" && leasedJob.job_type === "disable_access") {
         await env.DB.prepare(
           "UPDATE customer_packages SET status = 'expired' WHERE id = ? AND router_id = ? AND status IN ('active', 'expiring')",
