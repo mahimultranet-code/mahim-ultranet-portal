@@ -15,7 +15,7 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - One-time admin bootstrap protected by the ADMIN_SETUP_SECRET Worker secret.
 - Admin dashboard, customer directory/search, payment queue with approve/reject, complaint queue/replies, package catalogue create/update/enable/disable, and read-only package-order queue.
 - Emergency Internet request submission: ৳20 for 5 hours, account age at least 3 months, and at least 10 approved successful recharges of ৳10 or more each.
-- Emergency approval does not create debt. A separate admin confirmation records that RouterOS was manually activated; only then is the ৳20 debt created exactly once. This is an administrative assertion, not automatic RouterOS verification.
+- Emergency approval queues a Hotspot activation job for the enrolled router. The ৳20 debt is created only after the router reports successful activation; the request then expires five hours after that confirmation. This flow still requires staging and physical-router verification.
 - Customer password-reset requests with a generic response to avoid account enumeration; admin can set a new password, revoke existing customer sessions, and create an audit entry.
 - Admin actions write audit-log entries where implemented.
 
@@ -29,8 +29,9 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Overlapping access is blocked for the same customer/service while a package is `pending`, `active`, or `expiring`. Hotspot emergency access and a normal Hotspot package cannot overlap, preventing one session's expiry job from disabling another session.
 - A one-minute Worker Cron queues expiry jobs for active package records. Router-reported execution failures are requeued up to eight attempts; exhausted jobs remain failed for operator review.
 - Admins can map an existing RouterOS login to a portal customer with `POST /admin/customers/{id}/mikrotik-username` and JSON `{ "mikrotik_username": "existing-router-login" }`. The username must already exist on the router.
-- `routeros/mahim-ultranet-agent-template.rsc` is a RouterOS v7 executor template for existing Hotspot users and PPP secrets. It must be configured with the deployed staging Worker URL and one-time router token, then tested on a lab account before use.
-- Do not enroll or connect the live router until the RouterOS executor, credential/account mapping, retry behavior, and staging end-to-end tests are complete.
+- `routeros/mahim-ultranet-agent-template.rsc` is a single-run RouterOS v7 executor template for existing Hotspot users and PPP secrets. It does not enroll the router and does not install a recurring Scheduler. Configure the staging Worker URL and one-time router token only after a dedicated staging router has been enrolled.
+- The router must run this script repeatedly from a RouterOS Scheduler to poll jobs; the Scheduler command and required RouterOS policy must be validated on a lab router before installation. Without that recurring poll, queued activation and expiry jobs will not execute.
+- Do not enroll or connect the live router until the RouterOS executor, enrollment procedure, recurring poll schedule, credential/account mapping, retry behavior, and staging end-to-end tests are complete.
 
 ## Database migrations
 
@@ -77,10 +78,11 @@ Take a D1 backup before applying migrations. Do not run these migrations against
 
 - Live MikroTik/RouterOS rollout and end-to-end validation for Hotspot and PPPoE. The outbound transport, package queue, and RouterOS template exist on a feature branch only.
 - Live emergency RouterOS activation/expiry is wired into the queue, but it still needs staging and RouterOS lab validation.
-- Lab verification of RouterOS script execution, router profile prerequisites, acknowledgement retries, and package expiry.
+- Lab verification of RouterOS script execution, router profile prerequisites, recurring Scheduler installation/polling, acknowledgement retries, and package expiry.
 - Verified bKash/Nagad provider API or webhook reconciliation; payment approval is manual.
 - End-to-end Android Chrome verification of cross-site session cookies.
 - Full automated Worker + D1 integration test suite and verified staging test report.
+- Router enrollment helper and a tested, least-privilege recurring RouterOS Scheduler installation procedure.
 
 Do not advertise automatic Internet activation or accept real customer payments until the relevant integrations and end-to-end staging tests are implemented and verified.
 
@@ -89,7 +91,7 @@ Do not advertise automatic Internet activation or accept real customer payments 
 - Payment submissions never credit a wallet. Only an authenticated admin approval may credit it, with guarded status transitions and unique ledger references.
 - Package purchase debits the wallet and creates a pending order; when a router and username are mapped it also queues an activation job. Internet access is not considered active until the enrolled router executes and acknowledges that job.
 - The admin package-order endpoint is read-only. Do not mark an order active before RouterOS activation and verification exist.
-- Emergency approval alone creates no debt. The admin must manually verify actual RouterOS activation before using the confirmation endpoint; that endpoint creates the ৳20 debt.
+- Emergency approval alone creates no debt. The current queue flow creates the ৳20 debt only after an authenticated router acknowledges successful activation; verify this behavior against staging D1 and a lab router before real use.
 - Existing debts created by earlier code are not automatically reversed; reconcile them case by case.
 - Before RouterOS integration, require authenticated outbound commands, strict username/profile allowlists, least-privilege credentials, bounded timeouts, retries, replay protection, expiry enforcement, and router-side verification.
 - Never expose RouterOS management ports or credentials to the public internet.
