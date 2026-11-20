@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.js";
-import { encryptHotspotPassword } from "../src/router-agent.js";
+import { encryptHotspotPassword, queuePendingHotspotProvisioning } from "../src/router-agent.js";
 
 const PORTAL_ORIGIN = "https://mahimultranet-code.github.io";
 
@@ -177,6 +177,60 @@ test("admin cannot manually confirm emergency activation or create debt", async 
   assert.equal(batchCalled, false);
 });
 
+
+
+test("hotspot provisioning recovers an existing queued idempotent router job", async () => {
+  const updates = [];
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            all: async () => ({ results: [{ customer_id: 41, mikrotik_username: "customer41" }] }),
+            first: async () => ({ router_id: 9, status: "queued" }),
+            run: async () => {
+              if (sql.startsWith("UPDATE hotspot_provisioning")) updates.push({ sql, values });
+              return { meta: { changes: 1 } };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const queued = await queuePendingHotspotProvisioning(db, 9, 41);
+  assert.equal(queued, 1);
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].sql, /status = 'queued'/);
+  assert.deepEqual(updates[0].values, [9, 41]);
+});
+
+test("hotspot provisioning reconciles an already-applied router job and erases its credential", async () => {
+  const updates = [];
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            all: async () => ({ results: [{ customer_id: 42, mikrotik_username: "customer42" }] }),
+            first: async () => ({ router_id: 9, status: "applied" }),
+            run: async () => {
+              if (sql.startsWith("UPDATE hotspot_provisioning")) updates.push({ sql, values });
+              return { meta: { changes: 1 } };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const queued = await queuePendingHotspotProvisioning(db, 9, 42);
+  assert.equal(queued, 0);
+  assert.equal(updates.length, 1);
+  assert.match(updates[0].sql, /status = 'active'/);
+  assert.match(updates[0].sql, /password_ciphertext = ''/);
+  assert.match(updates[0].sql, /password_iv = ''/);
+});
 
 test("Hotspot credentials are encrypted with a 32-byte AES-GCM key", async () => {
   const key = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
