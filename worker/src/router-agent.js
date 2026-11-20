@@ -86,14 +86,41 @@ export async function queuePendingHotspotProvisioning(db, routerId, customerId =
       profile: "Mahim-Hotspot-5M",
       create_user: true,
     });
+    const idempotencyKey = "provision:hotspot:" + row.customer_id;
     const result = await db.prepare(
       "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'activate_hotspot', ?, ?)",
-    ).bind(routerId, payload, "provision:hotspot:" + row.customer_id).run();
+    ).bind(routerId, payload, idempotencyKey).run();
+
+    let job;
     if (Number(result.meta?.changes || 0) === 1) {
-      await db.prepare(
+      job = { router_id: routerId, status: "queued" };
+    } else {
+      // Recover the narrow failure window where the job was inserted but the
+      // provisioning row was not updated before the previous request stopped.
+      job = await db.prepare(
+        "SELECT router_id, status FROM router_jobs WHERE idempotency_key = ? LIMIT 1",
+      ).bind(idempotencyKey).first();
+    }
+
+    // An idempotency key is global. Never attach a customer's provisioning
+    // record to a job owned by a different router.
+    if (!job || Number(job.router_id) !== Number(routerId)) continue;
+
+    if (["queued", "leased"].includes(job.status)) {
+      const updated = await db.prepare(
         "UPDATE hotspot_provisioning SET status = 'queued', router_id = ?, updated_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND status = 'pending'",
       ).bind(routerId, row.customer_id).run();
-      queued++;
+      if (Number(updated.meta?.changes || 0) === 1) queued++;
+    } else if (job.status === "applied") {
+      // The router already confirmed this job; finish the database side of
+      // the acknowledgement and erase the one-time encrypted credential.
+      await db.prepare(
+        "UPDATE hotspot_provisioning SET status = 'active', password_ciphertext = '', password_iv = '', router_id = ?, updated_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND status IN ('pending', 'queued')",
+      ).bind(routerId, row.customer_id).run();
+    } else if (["failed", "cancelled"].includes(job.status)) {
+      await db.prepare(
+        "UPDATE hotspot_provisioning SET status = 'failed', router_id = ?, updated_at = CURRENT_TIMESTAMP WHERE customer_id = ? AND status = 'pending'",
+      ).bind(routerId, row.customer_id).run();
     }
   }
   return queued;
