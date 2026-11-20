@@ -1,3 +1,4 @@
+import { handleRouterAgent, encryptHotspotPassword, queuePendingHotspotProvisioning } from "./router-agent.js";
 const SERVICE = "mahim-ultranet-api-v2-staging";
 const ALLOWED_ORIGIN = "https://mahimultranet-code.github.io";
 const SESSION_COOKIE = "__Host-ultranet_session";
@@ -168,6 +169,9 @@ function publicCustomer(row) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/router/")) {
+      return handleRouterAgent(request, env, url);
+    }
     const cors = corsHeaders(request);
     const origin = request.headers.get("Origin");
 
@@ -190,10 +194,11 @@ export default {
     const adminComplaintReply = url.pathname.match(/^\/admin\/complaints\/(\d+)\/reply$/);
     const adminComplaintAllowed = Boolean(adminComplaintReply);
     const adminPackageAction = url.pathname.match(/^\/admin\/packages\/(\d+)$/);
+    const adminRouterUsernameAction = url.pathname.match(/^\/admin\/customers\/(\d+)\/mikrotik-username$/);
     const adminEmergencyAction = url.pathname.match(/^\/admin\/emergency\/(\d+)\/(approve|reject|activated)$/);
     const adminPasswordResetAction = url.pathname.match(/^\/admin\/password-resets\/(\d+)\/complete$/);
     const adminPackageAllowed = url.pathname === "/admin/packages" || Boolean(adminPackageAction);
-    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency", "/password-reset/request", "/admin/password-resets"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction && !adminPasswordResetAction) {
+    if (!["/auth/register", "/auth/login", "/auth/me", "/auth/logout", "/wallet", "/wallet/transactions", "/packages", "/payments/request", "/payments/mine", "/admin/payments", "/packages/purchase", "/packages/mine", "/admin/bootstrap", "/admin/dashboard", "/admin/customers", "/admin/package-orders", "/complaints", "/complaints/mine", "/admin/complaints", "/emergency/request", "/emergency/mine", "/admin/emergency", "/password-reset/request", "/admin/password-resets"].includes(url.pathname) && !adminPaymentAction && !adminComplaintAllowed && !adminPackageAllowed && !adminEmergencyAction && !adminPasswordResetAction && !adminRouterUsernameAction) {
       return fail("not_found", 404, cors);
     }
     if (!env.DB) return fail("service_unavailable", 503, cors);
@@ -268,6 +273,8 @@ export default {
         const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
         const password = typeof body.password === "string" ? body.password : "";
         const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
+        const hotspotPassword = typeof body.hotspot_password === "string" ? body.hotspot_password : "";
+        const confirmHotspotPassword = typeof body.confirmHotspotPassword === "string" ? body.confirmHotspotPassword : "";
 
         if (name.length < 2 || name.length > 80) return fail("invalid_name", 400, cors);
         if (!/^01[3-9]\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
@@ -276,8 +283,16 @@ export default {
         }
         if (password.length < 10 || password.length > 128) return fail("weak_password", 400, cors);
         if (password !== confirmPassword) return fail("password_mismatch", 400, cors);
+        if (hotspotPassword.length < 10 || hotspotPassword.length > 64) return fail("invalid_hotspot_password", 400, cors);
+        if (hotspotPassword !== confirmHotspotPassword) return fail("hotspot_password_mismatch", 400, cors);
         if (!(await rateLimit(env.DB, request, "register", mobile))) return fail("too_many_attempts", 429, cors);
 
+        let encryptedHotspotPassword;
+        try {
+          encryptedHotspotPassword = await encryptHotspotPassword(env, hotspotPassword);
+        } catch {
+          return fail("hotspot_provisioning_unavailable", 503, cors);
+        }
         const passwordHash = await hashPassword(password);
         let customer;
         try {
@@ -293,17 +308,35 @@ export default {
         if (!Number.isSafeInteger(customerId) || customerId < 1) {
           return fail("registration_unavailable", 500, cors);
         }
+        let mikrotikUsername = mobile;
         try {
-          await env.DB.prepare("INSERT INTO wallets (customer_id, balance_taka) VALUES (?, 0)").bind(customerId).run();
+          await env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ?").bind(mikrotikUsername, customerId).run();
+        } catch {
+          mikrotikUsername = "mu" + customerId;
+          await env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ?").bind(mikrotikUsername, customerId).run();
+        }
+        try {
+          await env.DB.batch([
+            env.DB.prepare("INSERT INTO wallets (customer_id, balance_taka) VALUES (?, 0)").bind(customerId),
+            env.DB.prepare(
+              "INSERT INTO hotspot_provisioning (customer_id, mikrotik_username, password_ciphertext, password_iv, status) VALUES (?, ?, ?, ?, 'pending')",
+            ).bind(customerId, mikrotikUsername, encryptedHotspotPassword.ciphertext, encryptedHotspotPassword.iv),
+          ]);
         } catch {
           await env.DB.prepare("DELETE FROM customers WHERE id = ?").bind(customerId).run();
           return fail("registration_unavailable", 500, cors);
+        }
+        let hotspotProvisioningStatus = "pending_router_enrollment";
+        const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+        if (router) {
+          const queued = await queuePendingHotspotProvisioning(env.DB, router.id, customerId);
+          if (queued === 1) hotspotProvisioningStatus = "queued_for_router";
         }
         const token = await createSession(env.DB, customerId);
         const row = await env.DB.prepare(
           "SELECT id, name, mobile, email, role, is_verified, mikrotik_username FROM customers WHERE id = ?",
         ).bind(customerId).first();
-        return json({ ok: true, customer: publicCustomer(row) }, 201, {
+        return json({ ok: true, customer: publicCustomer(row), hotspot_provisioning_status: hotspotProvisioningStatus }, 201, {
           ...cors,
           "set-cookie": sessionCookie(token),
         });
@@ -376,10 +409,28 @@ export default {
           return json({ ok: true, replayed: true, transaction: existing, activation_status: "pending" }, 200, cors);
         }
 
+        // Do not overlap a customer's access windows. The RouterOS executor disables
+        // an account at expiry, so a second package/emergency session on the same
+        // service could otherwise be cut off by the first session's expiry job.
+        const accessConflict = await env.DB.prepare(
+          `SELECT 1 AS conflict
+           FROM customer_packages
+           WHERE customer_id = ? AND service_type = ?
+             AND status IN ('pending', 'active', 'expiring')
+           UNION ALL
+           SELECT 1 AS conflict
+           FROM emergency_requests
+           WHERE customer_id = ? AND status IN ('pending', 'approved')
+             AND access_status IN ('pending', 'active', 'expiring')
+             AND ? = 'hotspot'
+           LIMIT 1`,
+        ).bind(customer.id, pkg.service_type, customer.id, pkg.service_type).first();
+        if (accessConflict) return fail("active_or_pending_access_exists", 409, cors);
+
         const results = await env.DB.batch([
           env.DB.prepare(
-            "INSERT INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT ?, 'package_purchase', ?, 'success', ? WHERE EXISTS (SELECT 1 FROM wallets WHERE customer_id = ? AND balance_taka >= ?) AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?)",
-          ).bind(customer.id, pkg.price_taka, reference, customer.id, pkg.price_taka, reference),
+            "INSERT INTO wallet_transactions (customer_id, type, amount_taka, status, reference) SELECT ?, 'package_purchase', ?, 'success', ? WHERE EXISTS (SELECT 1 FROM wallets WHERE customer_id = ? AND balance_taka >= ?) AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE reference = ?) AND NOT EXISTS (SELECT 1 FROM customer_packages WHERE customer_id = ? AND service_type = ? AND status IN ('pending', 'active', 'expiring')) AND NOT EXISTS (SELECT 1 FROM emergency_requests WHERE customer_id = ? AND status IN ('pending', 'approved') AND access_status IN ('pending', 'active', 'expiring') AND ? = 'hotspot')",
+          ).bind(customer.id, pkg.price_taka, reference, customer.id, pkg.price_taka, reference, customer.id, pkg.service_type, customer.id, pkg.service_type),
           env.DB.prepare(
             "UPDATE wallets SET balance_taka = balance_taka - ? WHERE customer_id = ? AND changes() = 1",
           ).bind(pkg.price_taka, customer.id),
@@ -389,12 +440,54 @@ export default {
         ]);
         const ledgerInserted = Number(results?.[0]?.meta?.changes || 0);
         if (ledgerInserted !== 1) {
-          const balance = await env.DB.prepare(
-            "SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1",
-          ).bind(customer.id).first();
+          const [balance, latestConflict] = await Promise.all([
+            env.DB.prepare("SELECT balance_taka FROM wallets WHERE customer_id = ? LIMIT 1").bind(customer.id).first(),
+            env.DB.prepare(
+              `SELECT 1 AS conflict
+               FROM customer_packages
+               WHERE customer_id = ? AND service_type = ?
+                 AND status IN ('pending', 'active', 'expiring')
+               UNION ALL
+               SELECT 1 AS conflict
+               FROM emergency_requests
+               WHERE customer_id = ? AND status IN ('pending', 'approved')
+                 AND access_status IN ('pending', 'active', 'expiring')
+                 AND ? = 'hotspot'
+               LIMIT 1`,
+            ).bind(customer.id, pkg.service_type, customer.id, pkg.service_type).first(),
+          ]);
+          if (latestConflict) return fail("active_or_pending_access_exists", 409, cors);
           return fail(balance ? "insufficient_wallet_balance_or_duplicate_request" : "wallet_not_found", 409, cors);
         }
         const orderId = Number(results?.[2]?.meta?.last_row_id || 0);
+        let routerJobQueued = false;
+        if (orderId && typeof customer.mikrotik_username === "string" &&
+            /^[A-Za-z0-9_.@-]{1,64}$/.test(customer.mikrotik_username)) {
+          const router = await env.DB.prepare(
+            "SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1",
+          ).first();
+          if (router) {
+            const jobType = pkg.service_type === "pppoe" ? "activate_pppoe" : "activate_hotspot";
+            const profile = pkg.service_type === "pppoe" ? "Mahim-PPPoE-10M" : "Mahim-Hotspot-5M";
+            const payload = JSON.stringify({
+              customer_package_id: orderId,
+              username: customer.mikrotik_username,
+              service_type: pkg.service_type,
+              profile,
+              speed_mbps: Number(pkg.speed_mbps),
+              duration_minutes: Number(pkg.duration_minutes),
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, ?, ?, ?)",
+            ).bind(router.id, jobType, payload, "activate:package:" + orderId).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare(
+                "UPDATE customer_packages SET router_id = ? WHERE id = ? AND customer_id = ? AND status = 'pending'",
+              ).bind(router.id, orderId, customer.id).run();
+              routerJobQueued = true;
+            }
+          }
+        }
         const order = orderId ? await env.DB.prepare(
           "SELECT id, package_id, service_type, price_taka, speed_mbps, status, created_at FROM customer_packages WHERE id = ? AND customer_id = ? LIMIT 1",
         ).bind(orderId, customer.id).first() : null;
@@ -405,8 +498,10 @@ export default {
           ok: true,
           order,
           balance_taka: Number(wallet?.balance_taka || 0),
-          activation_status: "pending",
-          message: "payment_deducted_package_waiting_for_router_activation",
+          activation_status: routerJobQueued ? "queued_for_router" : "pending_router_setup",
+          message: routerJobQueued
+            ? "payment_deducted_router_activation_queued"
+            : "payment_deducted_waiting_for_router_username_and_enrollment",
         }, 201, cors);
       }
 
@@ -495,8 +590,8 @@ export default {
         if (customer.role !== "customer") return fail("customer_account_required", 403, cors);
         if (!(await rateLimit(env.DB, request, "emergency-request", String(customer.id)))) return fail("too_many_attempts", 429, cors);
         const result = await env.DB.prepare(
-          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = ? AND (e2.status = 'pending' OR (e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))))",
-        ).bind(customer.id, customer.id, customer.id, customer.id, customer.id).run();
+          "INSERT INTO emergency_requests (customer_id, fee_taka, status) SELECT ?, 20, 'pending' WHERE (SELECT created_at FROM customers WHERE id = ?) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = ? AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = ? AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = ? AND (e2.status = 'pending' OR (e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id)))) AND NOT EXISTS (SELECT 1 FROM customer_packages cp WHERE cp.customer_id = ? AND cp.service_type = 'hotspot' AND cp.status IN ('pending', 'active', 'expiring'))",
+        ).bind(customer.id, customer.id, customer.id, customer.id, customer.id, customer.id).run();
         if (Number(result.meta?.changes || 0) !== 1) return fail("not_eligible_or_existing_debt_or_pending_request", 409, cors);
         return json({ ok: true, request_id: Number(result.meta?.last_row_id), fee_taka: 20, duration_minutes: 300, duration_hours: 5, status: "pending", activation_status: "pending_routeros_verification" }, 201, cors);
       }
@@ -680,30 +775,39 @@ export default {
         if (action === "approve") {
           const results = await env.DB.batch([
             env.DB.prepare(
-              "UPDATE emergency_requests SET status = 'approved' WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = emergency_requests.customer_id AND e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))",
-            ).bind(requestId),
+              "UPDATE emergency_requests SET status = 'approved', approved_by = ? WHERE id = ? AND status = 'pending' AND (SELECT created_at FROM customers WHERE id = emergency_requests.customer_id) <= datetime('now', '-3 months') AND (SELECT COUNT(*) FROM payment_requests WHERE customer_id = emergency_requests.customer_id AND status = 'approved' AND amount_taka >= 10) >= 10 AND NOT EXISTS (SELECT 1 FROM emergency_debts WHERE customer_id = emergency_requests.customer_id AND amount_due_taka > 0) AND NOT EXISTS (SELECT 1 FROM emergency_requests e2 WHERE e2.customer_id = emergency_requests.customer_id AND e2.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a2 WHERE a2.request_id = e2.id))",
+            ).bind(admin.id, requestId),
             env.DB.prepare(
               "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_request_approved', 'emergency_request_id=' || ? WHERE changes() = 1",
             ).bind(admin.id, requestId),
           ]);
           if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_pending_or_not_eligible_or_debt_exists", 409, cors);
-          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, duration_minutes: 300, duration_hours: 5, activation_status: "awaiting_routeros_confirmation", debt_created: false }, 200, cors);
+          const emergency = await env.DB.prepare(
+            "SELECT e.customer_id, c.mikrotik_username FROM emergency_requests e JOIN customers c ON c.id = e.customer_id WHERE e.id = ? LIMIT 1",
+          ).bind(requestId).first();
+          const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+          let queued = false;
+          if (router && /^[A-Za-z0-9_.@-]{1,64}$/.test(emergency?.mikrotik_username || "")) {
+            const payload = JSON.stringify({
+              emergency_request_id: requestId,
+              username: emergency.mikrotik_username,
+              service_type: "hotspot",
+              profile: "Mahim-Hotspot-5M",
+              duration_minutes: 300,
+            });
+            const job = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_activate', ?, ?)",
+            ).bind(router.id, payload, "activate:emergency:" + requestId).run();
+            if (Number(job.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE emergency_requests SET router_id = ? WHERE id = ? AND status = 'approved'").bind(router.id, requestId).run();
+              queued = true;
+            }
+          }
+          return json({ ok: true, request_id: requestId, status: "approved", fee_taka: 20, duration_minutes: 300, duration_hours: 5, activation_status: queued ? "queued_for_router" : "pending_router_setup", debt_created: false }, 200, cors);
         }
         if (action === "activated") {
-          if (!(await rateLimit(env.DB, request, "admin-emergency-activation", String(admin.id)))) return fail("too_many_attempts", 429, cors);
-          const results = await env.DB.batch([
-            env.DB.prepare(
-              "INSERT INTO emergency_activation_confirmations (request_id, customer_id, confirmed_by) SELECT e.id, e.customer_id, ? FROM emergency_requests e WHERE e.id = ? AND e.status = 'approved' AND NOT EXISTS (SELECT 1 FROM emergency_activation_confirmations a WHERE a.request_id = e.id) AND NOT EXISTS (SELECT 1 FROM emergency_debts d WHERE d.customer_id = e.customer_id AND d.amount_due_taka > 0)",
-            ).bind(admin.id, requestId),
-            env.DB.prepare(
-              "INSERT INTO emergency_debts (customer_id, amount_due_taka) SELECT e.customer_id, e.fee_taka FROM emergency_requests e JOIN emergency_activation_confirmations a ON a.request_id = e.id WHERE e.id = ? AND changes() = 1 ON CONFLICT(customer_id) DO UPDATE SET amount_due_taka = emergency_debts.amount_due_taka + excluded.amount_due_taka, updated_at = CURRENT_TIMESTAMP WHERE emergency_debts.amount_due_taka = 0",
-            ).bind(requestId),
-            env.DB.prepare(
-              "INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'emergency_routeros_activation_confirmed', 'emergency_request_id=' || ? WHERE changes() = 1",
-            ).bind(admin.id, requestId),
-          ]);
-          if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("request_not_approved_or_already_activated_or_debt_exists", 409, cors);
-          return json({ ok: true, request_id: requestId, activation_status: "confirmed_by_admin", debt_created_taka: 20 }, 200, cors);
+          // Activation and emergency debt are confirmed only by an authenticated RouterOS ACK.
+          return fail("router_confirmation_required", 409, cors);
         }
         const results = await env.DB.batch([
           env.DB.prepare("UPDATE emergency_requests SET status = 'rejected' WHERE id = ? AND status = 'pending'").bind(requestId),
@@ -787,6 +891,72 @@ export default {
         return json({ ok: true, customers: result.results || [] }, 200, cors);
       }
 
+      if (adminRouterUsernameAction && request.method === "POST") {
+        const admin = await getSessionCustomer(env.DB, request);
+        if (!admin) return fail("unauthorized", 401, cors);
+        if (admin.role !== "admin") return fail("forbidden", 403, cors);
+        const customerId = Number(adminRouterUsernameAction[1]);
+        if (!Number.isSafeInteger(customerId) || customerId < 1) return fail("invalid_customer_id", 400, cors);
+        const body = await readJson(request);
+        const username = typeof body.mikrotik_username === "string" ? body.mikrotik_username.trim() : "";
+        if (!/^[A-Za-z0-9_.@-]{1,64}$/.test(username)) return fail("invalid_mikrotik_username", 400, cors);
+        const duplicate = await env.DB.prepare(
+          "SELECT id FROM customers WHERE mikrotik_username = ? AND id <> ? LIMIT 1",
+        ).bind(username, customerId).first();
+        if (duplicate) return fail("mikrotik_username_already_in_use", 409, cors);
+        const results = await env.DB.batch([
+          env.DB.prepare("UPDATE customers SET mikrotik_username = ? WHERE id = ? AND role = 'customer'").bind(username, customerId),
+          env.DB.prepare("INSERT INTO admin_logs (admin_id, action, details) SELECT ?, 'customer_mikrotik_username_set', 'customer_id=' || ? WHERE changes() = 1").bind(admin.id, customerId),
+        ]);
+        if (Number(results?.[0]?.meta?.changes || 0) !== 1) return fail("customer_not_found_or_username_already_in_use", 409, cors);
+        let queuedOrders = 0;
+        const router = await env.DB.prepare("SELECT id FROM routers WHERE enabled = 1 ORDER BY id ASC LIMIT 1").first();
+        if (router) {
+          const pending = await env.DB.prepare(
+            "SELECT cp.id, cp.service_type, cp.speed_mbps, p.duration_minutes FROM customer_packages cp JOIN packages p ON p.id = cp.package_id WHERE cp.customer_id = ? AND cp.status = 'pending' AND cp.router_id IS NULL ORDER BY cp.id ASC LIMIT 50",
+          ).bind(customerId).all();
+          for (const item of pending.results || []) {
+            const jobType = item.service_type === "pppoe" ? "activate_pppoe" : "activate_hotspot";
+            const profile = item.service_type === "pppoe" ? "Mahim-PPPoE-10M" : "Mahim-Hotspot-5M";
+            const payload = JSON.stringify({
+              customer_package_id: Number(item.id),
+              username,
+              service_type: item.service_type,
+              profile,
+              speed_mbps: Number(item.speed_mbps),
+              duration_minutes: Number(item.duration_minutes),
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, ?, ?, ?)",
+            ).bind(router.id, jobType, payload, "activate:package:" + item.id).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE customer_packages SET router_id = ? WHERE id = ? AND status = 'pending'").bind(router.id, item.id).run();
+              queuedOrders++;
+            }
+          }
+          const emergencyPending = await env.DB.prepare(
+            "SELECT id FROM emergency_requests WHERE customer_id = ? AND status = 'approved' AND access_status = 'pending' AND approved_by IS NOT NULL AND router_id IS NULL ORDER BY id ASC LIMIT 20",
+          ).bind(customerId).all();
+          for (const item of emergencyPending.results || []) {
+            const payload = JSON.stringify({
+              emergency_request_id: Number(item.id),
+              username,
+              service_type: "hotspot",
+              profile: "Mahim-Hotspot-5M",
+              duration_minutes: 300,
+            });
+            const queued = await env.DB.prepare(
+              "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_activate', ?, ?)",
+            ).bind(router.id, payload, "activate:emergency:" + item.id).run();
+            if (Number(queued.meta?.changes || 0) === 1) {
+              await env.DB.prepare("UPDATE emergency_requests SET router_id = ? WHERE id = ? AND access_status = 'pending'").bind(router.id, item.id).run();
+              queuedOrders++;
+            }
+          }
+        }
+        return json({ ok: true, customer_id: customerId, mikrotik_username: username, queued_orders: queuedOrders }, 200, cors);
+      }
+
       if (url.pathname === "/admin/payments" && request.method === "GET") {
         const admin = await getSessionCustomer(env.DB, request);
         if (!admin) return fail("unauthorized", 401, cors);
@@ -863,5 +1033,60 @@ export default {
     }
 
     return fail("not_found", 404, cors);
+  },
+  async scheduled(controller, env, ctx) {
+    if (!env.DB) return;
+    const expired = await env.DB.prepare(
+      `SELECT cp.id, cp.router_id, cp.service_type, c.mikrotik_username
+       FROM customer_packages cp
+       JOIN customers c ON c.id = cp.customer_id
+       WHERE cp.status = 'active' AND cp.router_id IS NOT NULL
+         AND cp.expires_at IS NOT NULL
+         AND cp.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       ORDER BY cp.expires_at ASC LIMIT 100`,
+    ).all();
+    for (const item of expired.results || []) {
+      if (typeof item.mikrotik_username !== "string" ||
+          !/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username)) continue;
+      const payload = JSON.stringify({
+        customer_package_id: Number(item.id),
+        username: item.mikrotik_username,
+        service_type: item.service_type,
+      });
+      const queued = await env.DB.prepare(
+        "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'disable_access', ?, ?)",
+      ).bind(item.router_id, payload, "expire:package:" + item.id).run();
+      if (Number(queued.meta?.changes || 0) === 1) {
+        await env.DB.prepare(
+          "UPDATE customer_packages SET status = 'expiring' WHERE id = ? AND status = 'active'",
+        ).bind(item.id).run();
+      }
+    }
+    const emergencyExpired = await env.DB.prepare(
+      `SELECT e.id, e.router_id, c.mikrotik_username
+       FROM emergency_requests e
+       JOIN customers c ON c.id = e.customer_id
+       WHERE e.status = 'approved' AND e.access_status = 'active'
+         AND e.router_id IS NOT NULL AND e.expires_at IS NOT NULL
+         AND e.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       ORDER BY e.expires_at ASC LIMIT 100`,
+    ).all();
+    for (const item of emergencyExpired.results || []) {
+      if (typeof item.mikrotik_username !== "string" ||
+          !/^[A-Za-z0-9_.@-]{1,64}$/.test(item.mikrotik_username)) continue;
+      const payload = JSON.stringify({
+        emergency_request_id: Number(item.id),
+        username: item.mikrotik_username,
+        service_type: "hotspot",
+      });
+      const queued = await env.DB.prepare(
+        "INSERT OR IGNORE INTO router_jobs (router_id, job_type, payload_json, idempotency_key) VALUES (?, 'emergency_expire', ?, ?)",
+      ).bind(item.router_id, payload, "expire:emergency:" + item.id).run();
+      if (Number(queued.meta?.changes || 0) === 1) {
+        await env.DB.prepare(
+          "UPDATE emergency_requests SET access_status = 'expiring' WHERE id = ? AND access_status = 'active'",
+        ).bind(item.id).run();
+      }
+    }
   },
 };
