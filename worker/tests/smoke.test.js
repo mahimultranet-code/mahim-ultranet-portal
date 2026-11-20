@@ -190,7 +190,7 @@ test("hotspot provisioning recovers an existing queued idempotent router job", a
             first: async () => ({ router_id: 9, status: "queued" }),
             run: async () => {
               if (sql.startsWith("UPDATE hotspot_provisioning")) updates.push({ sql, values });
-              return { meta: { changes: 1 } };
+              return { meta: { changes: sql.startsWith("INSERT OR IGNORE INTO router_jobs") ? 0 : 1 } };
             },
           };
         },
@@ -216,7 +216,7 @@ test("hotspot provisioning reconciles an already-applied router job and erases i
             first: async () => ({ router_id: 9, status: "applied" }),
             run: async () => {
               if (sql.startsWith("UPDATE hotspot_provisioning")) updates.push({ sql, values });
-              return { meta: { changes: 1 } };
+              return { meta: { changes: sql.startsWith("INSERT OR IGNORE INTO router_jobs") ? 0 : 1 } };
             },
           };
         },
