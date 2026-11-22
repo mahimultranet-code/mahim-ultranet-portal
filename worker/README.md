@@ -29,7 +29,7 @@ Cloudflare Worker source for the Mahim UltraNet customer portal.
 - Overlapping access is blocked for the same customer/service while a package is `pending`, `active`, or `expiring`. Hotspot emergency access and a normal Hotspot package cannot overlap, preventing one session's expiry job from disabling another session.
 - A one-minute Worker Cron queues expiry jobs for active package records. Router-reported execution failures are requeued up to eight attempts; exhausted jobs remain failed for operator review.
 - Admins can map an existing RouterOS login to a portal customer with `POST /admin/customers/{id}/mikrotik-username` and JSON `{ "mikrotik_username": "existing-router-login" }`. The username must already exist on the router.
-- `routeros/mahim-ultranet-agent-template.rsc` is a single-run RouterOS v7 executor template for existing Hotspot users and PPP secrets. It does not enroll the router and does not install a recurring Scheduler. Configure the staging Worker URL and one-time router token only after a dedicated staging router has been enrolled.
+- `routeros/mahim-ultranet-agent-v7.rsc` is a RouterOS v7 executor installer for existing Hotspot users and PPP secrets. It does not enroll the router and does not install a recurring Scheduler. Configure the staging Worker URL and one-time router token only after a dedicated staging router has been enrolled.
 - The router must run this script repeatedly from a RouterOS Scheduler to poll jobs; the Scheduler command and required RouterOS policy must be validated on a lab router before installation. Without that recurring poll, queued activation and expiry jobs will not execute.
 - Do not enroll or connect the live router until the RouterOS executor, enrollment procedure, recurring poll schedule, credential/account mapping, retry behavior, and staging end-to-end tests are complete.
 
@@ -48,6 +48,7 @@ Apply these files to the isolated staging D1 database in this exact order:
 9. `0009_package_router_lifecycle.sql` — binds purchased package records to the router that accepted activation and indexes expiries.
 10. `0010_unique_mikrotik_username.sql` — prevents multiple portal customers from sharing a RouterOS username.
 11. `0011_emergency_router_lifecycle.sql` — records the approving admin, router, and five-hour emergency session expiry.
+12. `0012_hotspot_provisioning.sql` — stores first-time Hotspot credentials encrypted until the router confirms account creation, then clears the encrypted credential.
 
 Take a D1 backup before applying migrations. Do not run these migrations against production as part of staging setup.
 
