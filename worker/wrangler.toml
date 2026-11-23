@@ -1,0 +1,24 @@
+# Staging-only Cloudflare Worker configuration.
+# Cloudflare Build root directory: worker/
+# Deploy only to the separate staging Worker; do not connect this config to production.
+# The D1 binding below points only to the staging database.
+
+name = "mahim-ultranet-api-v2-staging"
+main = "src/index.js"
+compatibility_date = "2026-11-10"
+workers_dev = true
+
+[triggers]
+crons = ["*/1 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mahim-ultranet-db-staging"
+database_id = "36003129-58ce-4e10-9df4-709d3abb22f1"
+migrations_dir = "migrations"
+
+# Preview deployments must use the staging D1 database, never production.
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "mahim-ultranet-db-staging"
+database_id = "36003129-58ce-4e10-9df4-709d3abb22f1"

@@ -1,0 +1,99 @@
+name: Worker validation
+
+on:
+  pull_request:
+    paths:
+      - "worker/**"
+      - "portal-app.html"
+      - "index.html"
+      - ".github/workflows/worker-validation.yml"
+  push:
+    branches:
+      - "feature/routeros-outbound-agent"
+    paths:
+      - "worker/**"
+      - "portal-app.html"
+      - "index.html"
+      - ".github/workflows/worker-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check Worker JavaScript syntax
+        run: |
+          node --check worker/src/index.js
+          node --check worker/src/router-agent.js
+      - name: Run Worker health and CORS smoke tests
+        run: node --test worker/tests/*.test.js
+      - name: Check portal inline JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.active = False; self.parts = []; self.current = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'script' and not dict(attrs).get('src'):
+                      self.active = True; self.current = []
+              def handle_data(self, data):
+                  if self.active: self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag == 'script' and self.active:
+                      self.parts.append(''.join(self.current)); self.active = False
+          out = Path('/tmp/portal-inline-js'); out.mkdir(exist_ok=True)
+          count = 0
+          for html in ('portal-app.html', 'index.html'):
+              parser = Scripts()
+              parser.feed(Path(html).read_text(encoding='utf-8'))
+              for script in parser.parts:
+                  if script.strip():
+                      count += 1
+                      (out / ('script-' + str(count) + '.js')).write_text(script, encoding='utf-8')
+              print('Parsed inline scripts:', html)
+          print('Extracted', count, 'inline script block(s) across customer portal entry points')
+          PY
+          for file in /tmp/portal-inline-js/*.js; do node --check "$file"; done
+      - name: Validate D1 migrations against SQLite
+        run: |
+          python3 - <<'PY'
+          import glob, sqlite3
+          db = sqlite3.connect(":memory:")
+          db.execute("PRAGMA foreign_keys = ON")
+          for path in sorted(glob.glob("worker/migrations/*.sql")):
+              try:
+                  db.executescript(open(path, encoding="utf-8").read())
+                  print("OK", path)
+              except Exception as exc:
+                  raise SystemExit(f"FAILED {path}: {exc}")
+
+          # Guard the actual seeded catalogue, not only SQL syntax.
+          hotspot = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='hotspot' AND is_active=1").fetchone()[0]
+          pppoe = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='pppoe' AND is_active=1").fetchone()[0]
+          emergency_catalogue = db.execute("SELECT COUNT(*) FROM packages WHERE service_type='hotspot' AND duration_minutes=300 AND price_taka=20 AND is_active=1").fetchone()[0]
+          assert hotspot == 39, f"Expected 39 active regular Hotspot packages, got {hotspot}"
+          assert pppoe == 1, f"Expected 1 active PPPoE package, got {pppoe}"
+          assert emergency_catalogue == 0, "Emergency Internet must not appear in the regular package catalogue"
+          print("OK package catalogue: 39 Hotspot + 1 PPPoE; emergency offer separate")
+
+          # Confirm the database itself rejects recharge amounts below ৳10.
+          db.execute("INSERT INTO customers (name, mobile, password_hash) VALUES ('CI test', '01900000000', 'test-hash')")
+          customer_id = db.execute("SELECT id FROM customers WHERE mobile='01900000000'").fetchone()[0]
+          try:
+              db.execute("INSERT INTO payment_requests (customer_id, method, sender_mobile, transaction_id, amount_taka) VALUES (?, 'bkash', '01900000000', 'CI-UNDER-10', 9)", (customer_id,))
+              raise AssertionError("Database accepted a recharge below ৳10")
+          except sqlite3.IntegrityError as exc:
+              assert "minimum_recharge_is_10_taka" in str(exc), f"Unexpected rejection: {exc}"
+          db.execute("INSERT INTO payment_requests (customer_id, method, sender_mobile, transaction_id, amount_taka) VALUES (?, 'bkash', '01900000000', 'CI-10-OK', 10)", (customer_id,))
+          print("OK minimum recharge rule: ৳9 rejected; ৳10 accepted")
+          PY
+      - name: Build Worker with Wrangler
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/mahim-ultranet-worker-build --config worker/wrangler.toml

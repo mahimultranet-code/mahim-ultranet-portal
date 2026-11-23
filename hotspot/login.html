@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="cache-control" content="no-cache"><title>Mahim UltraNet Wi-Fi</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:22px;background:#071326;color:#f4f7ff;font:15px system-ui,"Noto Sans Bengali",sans-serif;display:grid;place-items:center}.card{width:min(440px,100%);padding:24px;border:1px solid #29496e;border-radius:22px;background:linear-gradient(145deg,#152b49,#0b1729);box-shadow:0 18px 50px #0006}h1{margin:0 0 6px;color:#bfdbfe}p{color:#b6c7dc;line-height:1.7;font-size:13px}.field{margin:14px 0}label{display:block;margin-bottom:6px;color:#dbeafe;font-size:13px}input{width:100%;padding:13px;border-radius:11px;border:1px solid #3d5d80;background:#071326;color:white;font:inherit}.btn{display:block;width:100%;padding:13px;border:0;border-radius:12px;background:#3b82f6;color:white;font-weight:800;text-align:center;text-decoration:none;margin-top:10px}.secondary{background:#203b5d;border:1px solid #45678c}.error{color:#fecaca;font-size:13px}
+</style><script src="md5.js"></script>
+</head>
+<body><main class="card">
+<h1>Mahim UltraNet</h1>
+<p>Wi‑Fi ব্যবহার করতে আপনার বিদ্যমান Hotspot ইউজারনেম ও পাসওয়ার্ড দিয়ে সংযোগ করুন। নতুন গ্রাহক হলে আগে পোর্টালে সাইন আপ করুন।</p>
+$(if error)<p class="error">$(error)</p>$(endif)
+<form name="login" action="$(link-login-only)" method="post" $(if chap-id) onsubmit="return doLogin()" $(endif)>
+<input type="hidden" name="dst" value="$(link-orig)"><input type="hidden" name="popup" value="true">
+<div class="field"><label>Hotspot ইউজারনেম</label><input name="username" value="$(username)" autocomplete="username" required></div>
+<div class="field"><label>Hotspot পাসওয়ার্ড</label><input name="password" type="password" autocomplete="current-password" required></div>
+<button class="btn" type="submit">Wi‑Fi সংযোগ করুন</button></form>
+<a class="btn secondary" href="https://mahimultranet-code.github.io/mahim-ultranet-portal/portal-app.html?source=hotspot">নতুন অ্যাকাউন্ট / গ্রাহক লগইন</a>
+<p>পোর্টাল অ্যাকাউন্ট ও Hotspot লগইন আলাদা হতে পারে। অ্যাকাউন্ট তৈরি করলেই রাউটারের Hotspot ইউজার স্বয়ংক্রিয়ভাবে তৈরি হয় না; সংযোগ চালুর আগে অ্যাডমিনের মাধ্যমে অ্যাকাউন্ট লিংক করতে হতে পারে।</p>
+</main>
+$(if chap-id)<script>
+function doLogin(){var f=document.login;f.password.value=hexMD5('$(chap-id)'+f.password.value+'$(chap-challenge)');return true;}
+</script>$(endif)
+</body></html>
