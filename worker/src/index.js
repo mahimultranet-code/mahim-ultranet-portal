@@ -273,22 +273,22 @@ export default {
         const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
         const password = typeof body.password === "string" ? body.password : "";
         const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
-        const hotspotPassword = typeof body.hotspot_password === "string" ? body.hotspot_password : "";
-        const confirmHotspotPassword = typeof body.confirmHotspotPassword === "string" ? body.confirmHotspotPassword : "";
-
+        
         if (name.length < 2 || name.length > 80) return fail("invalid_name", 400, cors);
         if (!/^01[3-9]\d{8}$/.test(mobile)) return fail("invalid_mobile", 400, cors);
         if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
           return fail("invalid_email", 400, cors);
         }
-        if (password.length < 10 || password.length > 128) return fail("weak_password", 400, cors);
+        if (password.length < 8 || password.length > 128) return fail("weak_password", 400, cors);
         if (password !== confirmPassword) return fail("password_mismatch", 400, cors);
-        if (hotspotPassword.length < 10 || hotspotPassword.length > 64) return fail("invalid_hotspot_password", 400, cors);
-        if (hotspotPassword !== confirmHotspotPassword) return fail("hotspot_password_mismatch", 400, cors);
-        if (!(await rateLimit(env.DB, request, "register", mobile))) return fail("too_many_attempts", 429, cors);
+                if (!(await rateLimit(env.DB, request, "register", mobile))) return fail("too_many_attempts", 429, cors);
 
+        // Generate a strong private Hotspot credential automatically during signup.
+        // The customer only chooses a portal password; never expose this credential in API output.
         let encryptedHotspotPassword;
         try {
+          const hotspotBytes = crypto.getRandomValues(new Uint8Array(24));
+          const hotspotPassword = Array.from(hotspotBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
           encryptedHotspotPassword = await encryptHotspotPassword(env, hotspotPassword);
         } catch {
           return fail("hotspot_provisioning_unavailable", 503, cors);
