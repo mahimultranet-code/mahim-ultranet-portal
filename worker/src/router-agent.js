@@ -165,7 +165,7 @@ export async function handleRouterAgent(request, env, url) {
       const supplied = request.headers.get("X-Router-Enroll-Secret") || "";
       const expectedHash = await digest(env.ROUTER_ENROLLMENT_SECRET);
       const suppliedHash = await digest(supplied);
-      if (!safeEqual(expectedHash, suppliedHash)) return response({ ok: false, error: "unauthorized" }, 401);
+      if (!safeEqual(expectedHash, suppliedHash)) return response({ ok: false, error: "unauthorized" }, 403);
       const body = await readBody(request);
       const routerKey = typeof body.router_key === "string" ? body.router_key.trim() : "";
       const routerName = typeof body.router_name === "string" ? body.router_name.trim() : "";
