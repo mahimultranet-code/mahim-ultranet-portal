@@ -1,6 +1,7 @@
 # Staging-only Cloudflare Worker configuration.
 # Cloudflare Build root directory: worker/
 # Deploy only to the separate staging Worker; do not connect this config to production.
+# Router-agent staging deployment refresh: 2026-11-25.
 # The D1 binding below points only to the staging database.
 
 name = "mahim-ultranet-api-v2-staging"
